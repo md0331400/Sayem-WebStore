@@ -67,6 +67,11 @@
   .btn-danger:hover { background: rgba(255,60,60,0.22); }
   .btn-sm { padding: 8px 16px; font-size: 13px; }
   .btn-full { width: 100%; }
+  .btn-apk {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: #fff; box-shadow: 0 0 12px rgba(34,197,94,0.35);
+  }
+  .btn-apk:hover { transform: translateY(-2px); box-shadow: 0 0 24px rgba(34,197,94,0.5); }
 
   .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
   .input-group label { font-size: 13px; color: var(--text-dim); font-weight: 500; letter-spacing: .5px; }
@@ -204,6 +209,16 @@
   }
   .nav-item:hover { background: var(--orange-dim); color: var(--orange); }
   .nav-item .nav-icon { font-size: 18px; width: 24px; text-align: center; }
+  .nav-item-apk {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px; border-radius: var(--radius-sm);
+    cursor: pointer; transition: all .2s; color: #22c55e;
+    font-weight: 600; font-size: 15px; border: 1px solid rgba(34,197,94,0.3);
+    background: rgba(34,197,94,0.08); width: 100%; text-align: left;
+    margin-top: 8px;
+  }
+  .nav-item-apk:hover { background: rgba(34,197,94,0.18); border-color: #22c55e; }
+  .nav-item-apk .nav-icon { font-size: 18px; width: 24px; text-align: center; }
   .side-menu-footer { padding: 20px; border-top: 1px solid var(--border); }
   .side-user-info { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
   .side-avatar {
@@ -387,7 +402,7 @@
 <div id="authPage" class="page">
   <div class="auth-box">
     <div class="auth-logo">
-      <div class="auth-logo-icon"></div>
+      <div class="auth-logo-icon">🛒</div>
       <div class="auth-logo-title">SamWeb Store</div>
     </div>
     <div class="auth-tabs">
@@ -493,7 +508,7 @@
     <div class="about-info-row"><div class="about-info-label">Creator</div><div class="about-info-value">Md. Abu Sayem (amisayem)</div></div>
     <div class="about-info-row"><div class="about-info-label">Address</div><div class="about-info-value">Bangladesh 🇧🇩</div></div>
     <div class="about-info-row"><div class="about-info-label">Email</div><div class="about-info-value">abusayem0866@gmail.com</div></div>
-    <div class="about-info-row"><div class="about-info-label">Version</div><div class="about-info-value"><span class="chip">v3.2.0</span></div></div>
+    <div class="about-info-row"><div class="about-info-label">Version</div><div class="about-info-value"><span class="chip">v4.0.0</span></div></div>
     <div style="margin-top:20px;padding:14px;background:var(--orange-dim);border-radius:var(--radius-sm);border:1px solid var(--border);">
       <div style="font-size:13px;color:var(--text-dim);line-height:1.7;">SamWeb Store is a free platform to discover and download the best apps and games. Built with ❤️ in Bangladesh.</div>
     </div>
@@ -531,7 +546,7 @@
 </script>
 
 <script>
-// STATE
+// ============ STATE ============
 let currentUser = null;
 let selectedGender = 'Male';
 let allApps = [];
@@ -539,138 +554,135 @@ let firebaseReady = false;
 let currentAppId = null;
 let selectedRatingValue = 0;
 
-// ============ UPDATED VISITOR TRACKING WITH HISTORY & RAM ============
-function getDeviceId(){ 
-  let d=localStorage.getItem('samweb_device_id'); 
-  if(!d){ 
-    d='dev_'+Math.random().toString(36).substr(2,9)+Date.now(); 
-    localStorage.setItem('samweb_device_id',d); 
-  } 
-  return d; 
+// ============ DEVICE TOKEN — একটাই stable token per device ============
+// localStorage এ সেভ থাকে, same device এ যেকোনো browser থেকে ঢুকলে
+// যদি আগে কখনো একই browser এ ঢুকে থাকে তাহলে same token পাবে।
+// ভিন্ন browser আলাদা token পাবে (browser isolation), কিন্তু
+// একই browser এ multiple tab/session = same token (no fake duplicates)
+function getDeviceToken() {
+  const KEY = 'samweb_device_token_v2';
+  let token = localStorage.getItem(KEY);
+  if (!token) {
+    // Generate once, store forever
+    const rand = Math.random().toString(36).substr(2, 9);
+    const ts = Date.now().toString(36);
+    token = 'dt_' + rand + ts;
+    localStorage.setItem(KEY, token);
+  }
+  return token;
 }
 
-function getDeviceInfo(){
-  const ua=navigator.userAgent; 
-  let n='Unknown', t='desktop', b='Unknown';
-  
-  if(/Android/i.test(ua)){ 
-    const m=ua.match(/;\s([^;]+)\sBuild/); 
-    n=m?m[1]:'Android'; 
-    t='mobile'; 
+function getDeviceInfo() {
+  const ua = navigator.userAgent;
+  let deviceName = 'Unknown', deviceType = 'desktop', browser = 'Unknown';
+
+  if (/Android/i.test(ua)) {
+    const m = ua.match(/;\s([^;]+)\sBuild/);
+    deviceName = m ? m[1] : 'Android';
+    deviceType = 'mobile';
+  } else if (/iPhone|iPad|iPod/i.test(ua)) {
+    deviceName = 'Apple Device';
+    deviceType = 'mobile';
+  } else if (/Windows/i.test(ua)) {
+    deviceName = 'Windows PC';
+  } else if (/Mac/i.test(ua)) {
+    deviceName = 'Mac';
   }
-  else if(/iPhone|iPad|iPod/i.test(ua)){ n='Apple Device'; t='mobile'; }
-  else if(/Windows/i.test(ua)) n='Windows PC';
-  else if(/Mac/i.test(ua)) n='Mac';
-  
-  if(ua.includes('Firefox')) b='Firefox'; 
-  else if(ua.includes('Edg')) b='Edge'; 
-  else if(ua.includes('Chrome')) b='Chrome'; 
-  else if(ua.includes('Safari')) b='Safari';
-  
-  // Device RAM
-  let ram = 'Unknown';
-  if(navigator.deviceMemory){
-    ram = navigator.deviceMemory + ' GB';
-  }
-  
-  // CPU Cores
-  const cpuCores = navigator.hardwareConcurrency || 'Unknown';
-  
+
+  if (ua.includes('Firefox')) browser = 'Firefox';
+  else if (ua.includes('Edg')) browser = 'Edge';
+  else if (ua.includes('Chrome')) browser = 'Chrome';
+  else if (ua.includes('Safari')) browser = 'Safari';
+
   return {
-    deviceName: n,
-    deviceType: t,
-    browser: b,
+    deviceName,
+    deviceType,
+    browser,
     platform: navigator.platform || 'Unknown',
     language: navigator.language || 'Unknown',
     screen: window.screen.width + 'x' + window.screen.height,
-    ram: ram,
-    cpuCores: cpuCores,
+    ram: navigator.deviceMemory ? navigator.deviceMemory + ' GB' : 'Unknown',
+    cpuCores: navigator.hardwareConcurrency || 'Unknown',
     userAgent: ua
   };
 }
 
-function getConnectionInfo(){
+function getConnectionInfo() {
   const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  if(conn){
+  if (conn) {
     return {
       effectiveType: conn.effectiveType || 'Unknown',
       downlink: conn.downlink ? conn.downlink + ' Mbps' : 'Unknown',
-      rtt: conn.rtt ? conn.rtt + ' ms' : 'Unknown',
-      saveData: conn.saveData || false
+      rtt: conn.rtt ? conn.rtt + ' ms' : 'Unknown'
     };
   }
-  return { effectiveType: 'Unknown', downlink: 'Unknown', rtt: 'Unknown', saveData: false };
+  return { effectiveType: 'Unknown', downlink: 'Unknown', rtt: 'Unknown' };
 }
 
-async function getBatteryInfo(){ 
-  try{ 
+async function getBatteryInfo() {
+  try {
     const bt = await navigator.getBattery();
-    return {
-      level: Math.round(bt.level * 100) + '%',
-      charging: bt.charging ? '⚡ Charging' : '🔋 Battery'
-    };
-  } catch(e){ 
-    return { level: 'N/A', charging: 'N/A' }; 
-  } 
+    return { level: Math.round(bt.level * 100) + '%', charging: bt.charging ? '⚡ Charging' : '🔋 Battery' };
+  } catch (e) {
+    return { level: 'N/A', charging: 'N/A' };
+  }
 }
 
-async function getIP(){ 
-  try{ 
-    const r = await fetch('https://api.ipify.org?format=json'); 
-    return (await r.json()).ip; 
-  } catch(e){ 
-    return null; 
-  } 
+async function getIP() {
+  try {
+    const r = await fetch('https://api.ipify.org?format=json');
+    return (await r.json()).ip;
+  } catch (e) {
+    return null;
+  }
 }
 
-async function recordVisit(){
-  if(!firebaseReady){ setTimeout(recordVisit, 1000); return; }
+// ============ DEVICE TOKEN ভিত্তিক VISITOR TRACKING ============
+// প্রতিটি device এর একটাই entry থাকবে visitors/ এ
+// same device থেকে বারবার ঢুকলে visitCount বাড়বে, নতুন entry হবে না
+// account create করলে সেই entry তেই user info যোগ হবে
+// logout করলে user info থেকে যাবে কিন্তু device entry থাকবে
+async function recordVisit() {
+  if (!firebaseReady) { setTimeout(recordVisit, 1000); return; }
 
   try {
-    const deviceId = getDeviceId();
+    const deviceToken = getDeviceToken();
     const di = getDeviceInfo();
     const conn = getConnectionInfo();
     const battery = await getBatteryInfo();
     const ip = await getIP();
     const now = Date.now();
-    const visitorRef = window._ref(window._db, `visitors/${deviceId}`);
 
-    // Get existing data
+    const visitorRef = window._ref(window._db, `visitors/${deviceToken}`);
     const snap = await window._get(visitorRef);
-    const existingData = snap.exists() ? snap.val() : {};
+    const existing = snap.exists() ? snap.val() : {};
 
-    // Create visit entry for history
+    // Visit history entry
     const visitEntry = {
       timestamp: now,
       ip: ip || 'N/A',
-      screenResolution: di.screen,
       browser: di.browser,
       platform: di.platform,
       language: di.language,
+      screenResolution: di.screen,
       ram: di.ram,
       cpuCores: di.cpuCores,
       connectionType: conn.effectiveType,
       connectionSpeed: conn.downlink,
-      connectionRtt: conn.rtt,
       batteryLevel: battery.level,
       batteryStatus: battery.charging,
       userAgent: di.userAgent
     };
 
-    // Get existing history array or create new one
-    let history = existingData.visitHistory || [];
-    
-    // Add new visit to beginning of history
+    // History — last 20 visits
+    let history = existing.visitHistory || [];
+    if (!Array.isArray(history)) history = Object.values(history).filter(Boolean);
     history.unshift(visitEntry);
-    
-    // Keep only last 20 visits
-    if(history.length > 20){
-      history = history.slice(0, 20);
-    }
+    if (history.length > 20) history = history.slice(0, 20);
 
-    // Main visitor data
+    // Build visitor data
     const visitorData = {
-      deviceId: deviceId,
+      deviceToken: deviceToken,
       deviceName: di.deviceName,
       deviceType: di.deviceType,
       browser: di.browser,
@@ -679,129 +691,154 @@ async function recordVisit(){
       screenResolution: di.screen,
       ram: di.ram,
       cpuCores: di.cpuCores,
-      ip: ip || existingData.ip || 'N/A',
+      ip: ip || existing.ip || 'N/A',
       battery: battery.level,
       batteryStatus: battery.charging,
       lastVisit: now,
-      visitCount: (existingData.visitCount || 0) + 1,
-      visitHistory: history
+      visitCount: (existing.visitCount || 0) + 1,
+      visitHistory: history,
+      firstVisit: existing.firstVisit || now
     };
 
-    // Set first visit if new
-    if(!snap.exists()){
-      visitorData.firstVisit = now;
-    }
-
-    // Add user info if logged in
-    if(currentUser){
-      visitorData.userId = currentUser.key || currentUser.email;
+    // User info — যদি লগইন থাকে তাহলে সেই device entry তেই user data লেখা হবে
+    if (currentUser) {
+      visitorData.userId = currentUser.key || '';
       visitorData.userName = currentUser.name || 'User';
       visitorData.userEmail = currentUser.email || '';
       visitorData.userPhone = currentUser.number || '';
       visitorData.userGender = currentUser.gender || '';
+    } else {
+      // Guest — কিন্তু আগে যদি user থাকত সেটা রাখা যেতে পারে বা না রাখতে পারি
+      // এখানে remove করব না — device entry টা থাকবে, শুধু user fields বাদ দিব না
+      // কারণ admin দেখতে পাবে এই device এ আগে কোন user ছিল
+      if (existing.userName) {
+        visitorData.userId = existing.userId || '';
+        visitorData.userName = existing.userName;
+        visitorData.userEmail = existing.userEmail || '';
+        visitorData.userPhone = existing.userPhone || '';
+        visitorData.userGender = existing.userGender || '';
+      }
     }
 
-    // Save to Firebase
     await window._set(visitorRef, visitorData);
-    console.log('✅ Visit recorded with history:', deviceId, '- Visit #' + visitorData.visitCount);
+    console.log('✅ Visit recorded | Token:', deviceToken, '| Visit #' + visitorData.visitCount);
 
-  } catch(e){
+  } catch (e) {
     console.error('❌ Visit recording error:', e);
   }
 }
-// ============ END UPDATED TRACKING ============
 
-// PARTICLES
-(function(){
+// ============ WEBSITE SETTINGS (APK link সহ) ============
+let apkDownloadLink = null;
+
+async function loadWebsiteSettings() {
+  // Local name
+  const savedName = localStorage.getItem('website_name');
+  if (savedName) {
+    const nameEl = document.getElementById('websiteName');
+    if (nameEl) nameEl.innerHTML = escapeHtml(savedName);
+  }
+  // Firebase থেকে APK link লোড
+  if (firebaseReady) {
+    try {
+      const snap = await window._get(window._ref(window._db, 'settings/apkDownloadLink'));
+      if (snap.exists() && snap.val()) {
+        apkDownloadLink = snap.val();
+      } else {
+        apkDownloadLink = null;
+      }
+      buildSideMenu(); // re-render with/without APK button
+    } catch (e) {}
+  }
+}
+
+// ============ PARTICLES ============
+(function () {
   const wrap = document.getElementById('particles');
-  if(wrap){
-    for(let i=0;i<12;i++){
+  if (wrap) {
+    for (let i = 0; i < 12; i++) {
       const p = document.createElement('div');
       p.className = 'particle';
-      const size = Math.random()*6+3;
-      p.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*100}%;animation-duration:${Math.random()*15+10}s;animation-delay:${Math.random()*10}s;opacity:${Math.random() * 0.12 + 0.04};`;
+      const size = Math.random() * 6 + 3;
+      p.style.cssText = `width:${size}px;height:${size}px;left:${Math.random() * 100}%;animation-duration:${Math.random() * 15 + 10}s;animation-delay:${Math.random() * 10}s;opacity:${Math.random() * 0.12 + 0.04};`;
       wrap.appendChild(p);
     }
   }
 })();
 
-function toast(msg, type='info', dur=2800){
+function toast(msg, type = 'info', dur = 2800) {
   const t = document.getElementById('toast');
-  if(!t) return;
+  if (!t) return;
   t.textContent = msg;
   t.className = 'show ' + type;
-  setTimeout(()=>{ if(t) t.className=''; }, dur);
+  setTimeout(() => { if (t) t.className = ''; }, dur);
 }
 
-function escapeHtml(str){
-  if(!str) return '';
-  return str.replace(/[&<>]/g, function(m){
-    if(m === '&') return '&amp;';
-    if(m === '<') return '&lt;';
-    if(m === '>') return '&gt;';
-    return m;
-  });
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m] || m));
 }
 
-// PAGE ROUTING
-function showPage(id){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+// ============ PAGE ROUTING ============
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const targetPage = document.getElementById(id);
-  if(targetPage) targetPage.classList.add('active');
+  if (targetPage) targetPage.classList.add('active');
   closeMenu();
-  if(id==='homePage') loadApps();
+  if (id === 'homePage') loadApps();
 }
 window.showPage = showPage;
 
-function scrollToTop(){ window.scrollTo({top:0,behavior:'smooth'}); }
+function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
 window.scrollToTop = scrollToTop;
 
 function navigateToHome() { showPage('homePage'); closeMenu(); }
 function navigateToReport() { openReport(); closeMenu(); }
 function navigateToAbout() { openAbout(); closeMenu(); }
 
-// WEBSITE SETTINGS
-function loadWebsiteSettings(){
-  const savedName = localStorage.getItem('website_name');
-  if(savedName){
-    const nameEl = document.getElementById('websiteName');
-    if(nameEl) nameEl.innerHTML = escapeHtml(savedName);
+function openApkDownload() {
+  closeMenu();
+  if (apkDownloadLink && apkDownloadLink.startsWith('http')) {
+    window.open(apkDownloadLink, '_blank');
+  } else {
+    toast('APK link not set by admin yet.', 'error');
   }
 }
+window.openApkDownload = openApkDownload;
 
-// SESSION
-function loadSession(){
+// ============ SESSION ============
+function loadSession() {
   const saved = localStorage.getItem('samweb_user');
-  if(saved){
+  if (saved) {
     try {
       currentUser = JSON.parse(saved);
       updateHeaderUser();
       buildSideMenu();
-    } catch(e) { console.error('Session parse error'); }
+    } catch (e) { console.error('Session parse error'); }
   } else {
     buildSideMenu();
   }
 }
 
-function saveSession(user){
+function saveSession(user) {
   currentUser = user;
   localStorage.setItem('samweb_user', JSON.stringify(user));
   updateHeaderUser();
   buildSideMenu();
-  recordVisit(); // Update visitor after login
+  recordVisit(); // Update visitor record with user info after login
 }
 
-function clearSession(){
+function clearSession() {
   currentUser = null;
   localStorage.removeItem('samweb_user');
   updateHeaderUser();
   buildSideMenu();
 }
 
-function updateHeaderUser(){
+function updateHeaderUser() {
   const el = document.getElementById('headerUser');
-  if(el){
-    if(currentUser){
+  if (el) {
+    if (currentUser) {
       el.style.display = 'block';
       el.textContent = '👤 ' + (currentUser.name || 'User').split(' ')[0];
     } else {
@@ -810,10 +847,10 @@ function updateHeaderUser(){
   }
 }
 
-function buildSideMenu(){
+function buildSideMenu() {
   const nav = document.getElementById('sideNav');
   const footer = document.getElementById('sideFooter');
-  if(!nav || !footer) return;
+  if (!nav || !footer) return;
   nav.innerHTML = '';
   footer.innerHTML = '';
 
@@ -835,295 +872,269 @@ function buildSideMenu(){
   aboutBtn.onclick = navigateToAbout;
   nav.appendChild(aboutBtn);
 
-  if(currentUser){
-    footer.innerHTML = `<div class="side-user-info"><div class="side-avatar">${(currentUser.name||'U')[0].toUpperCase()}</div><div><div class="side-user-name">${escapeHtml(currentUser.name||'User')}</div><div class="side-user-email">${escapeHtml(currentUser.email||currentUser.number||'')}</div></div></div><button class="btn btn-danger btn-full btn-sm" onclick="doLogout()">🚪 Logout</button>`;
+  // APK Download button — admin থেকে link সেট থাকলে দেখাবে
+  if (apkDownloadLink) {
+    const apkBtn = document.createElement('button');
+    apkBtn.className = 'nav-item-apk';
+    apkBtn.innerHTML = '<span class="nav-icon">📦</span>Download APK';
+    apkBtn.onclick = openApkDownload;
+    nav.appendChild(apkBtn);
+  }
+
+  if (currentUser) {
+    footer.innerHTML = `<div class="side-user-info"><div class="side-avatar">${(currentUser.name || 'U')[0].toUpperCase()}</div><div><div class="side-user-name">${escapeHtml(currentUser.name || 'User')}</div><div class="side-user-email">${escapeHtml(currentUser.email || currentUser.number || '')}</div></div></div><button class="btn btn-danger btn-full btn-sm" onclick="doLogout()">🚪 Logout</button>`;
   } else {
     footer.innerHTML = `<button class="btn btn-primary btn-full" onclick="showPage('authPage');closeMenu();">🔑 Login / Sign Up</button>`;
   }
 }
 
-function openMenu(){
-  const menu = document.getElementById('sideMenu');
-  const overlay = document.getElementById('sideOverlay');
-  if(menu) menu.classList.add('open');
-  if(overlay) overlay.classList.add('open');
+function openMenu() {
+  document.getElementById('sideMenu')?.classList.add('open');
+  document.getElementById('sideOverlay')?.classList.add('open');
 }
-function closeMenu(){
-  const menu = document.getElementById('sideMenu');
-  const overlay = document.getElementById('sideOverlay');
-  if(menu) menu.classList.remove('open');
-  if(overlay) overlay.classList.remove('open');
+function closeMenu() {
+  document.getElementById('sideMenu')?.classList.remove('open');
+  document.getElementById('sideOverlay')?.classList.remove('open');
 }
 window.openMenu = openMenu;
 window.closeMenu = closeMenu;
 
-// AUTH
-function switchAuth(tab){
+// ============ AUTH ============
+function switchAuth(tab) {
   const tabs = document.querySelectorAll('.auth-tab');
-  if(tabs.length >= 2){
-    tabs[0].classList.toggle('active', tab==='login');
-    tabs[1].classList.toggle('active', tab==='signup');
+  if (tabs.length >= 2) {
+    tabs[0].classList.toggle('active', tab === 'login');
+    tabs[1].classList.toggle('active', tab === 'signup');
   }
   const loginForm = document.getElementById('loginForm');
   const signupForm = document.getElementById('signupForm');
   const errorDiv = document.getElementById('signupError');
-  if(errorDiv) errorDiv.classList.remove('show');
-  if(loginForm) loginForm.classList.toggle('active', tab==='login');
-  if(signupForm) signupForm.classList.toggle('active', tab==='signup');
+  if (errorDiv) errorDiv.classList.remove('show');
+  if (loginForm) loginForm.classList.toggle('active', tab === 'login');
+  if (signupForm) signupForm.classList.toggle('active', tab === 'signup');
 }
 window.switchAuth = switchAuth;
 
-function selectGender(g, el){
+function selectGender(g, el) {
   selectedGender = g;
-  document.querySelectorAll('.gender-opt').forEach(x=>x.classList.remove('selected'));
+  document.querySelectorAll('.gender-opt').forEach(x => x.classList.remove('selected'));
   el.classList.add('selected');
 }
 window.selectGender = selectGender;
 
-async function doLogin(){
+async function doLogin() {
   const identifier = document.getElementById('loginEmail')?.value.trim();
   const pass = document.getElementById('loginPass')?.value;
-  if(!identifier||!pass){ toast('Please fill all fields','error'); return; }
-
-  if(!firebaseReady){ toast('Connecting to database...','info'); return; }
+  if (!identifier || !pass) { toast('Please fill all fields', 'error'); return; }
+  if (!firebaseReady) { toast('Connecting to database...', 'info'); return; }
   try {
     const snap = await window._get(window._ref(window._db, 'users'));
-    if(snap.exists()){
+    if (snap.exists()) {
       let found = null;
-      snap.forEach(child=>{
+      snap.forEach(child => {
         const u = child.val();
-        if((u.email===identifier || u.number===identifier) && u.password===pass){
+        if ((u.email === identifier || u.number === identifier) && u.password === pass) {
           found = { ...u, key: child.key };
         }
       });
-      if(found){
+      if (found) {
         saveSession(found);
-        toast('Welcome back, '+(found.name||'User')+'! 🎉','success');
+        toast('Welcome back, ' + (found.name || 'User') + '! 🎉', 'success');
         showPage('homePage');
       } else {
-        toast('Invalid credentials!','error');
+        toast('Invalid credentials!', 'error');
       }
-    } else { toast('No users found. Please sign up!','error'); }
-  } catch(e){ toast('Error: '+e.message,'error'); }
+    } else { toast('No users found. Please sign up!', 'error'); }
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
 }
 window.doLogin = doLogin;
 
-async function doSignup(){
+async function doSignup() {
   const name = document.getElementById('signName')?.value.trim();
   const email = document.getElementById('signEmail')?.value.trim();
   const phone = document.getElementById('signPhone')?.value.trim();
   const pass = document.getElementById('signPass')?.value;
   const errorDiv = document.getElementById('signupError');
-  
-  if(errorDiv) {
-    errorDiv.innerHTML = '';
-    errorDiv.classList.remove('show');
+
+  if (errorDiv) { errorDiv.innerHTML = ''; errorDiv.classList.remove('show'); }
+
+  if (!name || !email || !phone || !pass) {
+    if (errorDiv) { errorDiv.innerHTML = '❌ Please fill all fields!'; errorDiv.classList.add('show'); }
+    return;
   }
-  
-  if(!name||!email||!phone||!pass){ 
-    if(errorDiv) {
-      errorDiv.innerHTML = '❌ Please fill all fields!';
-      errorDiv.classList.add('show');
-    }
-    return; 
-  }
-  if(pass.length < 6){ 
-    if(errorDiv) {
-      errorDiv.innerHTML = '❌ Password must be at least 6 characters!';
-      errorDiv.classList.add('show');
-    }
-    return; 
+  if (pass.length < 6) {
+    if (errorDiv) { errorDiv.innerHTML = '❌ Password must be at least 6 characters!'; errorDiv.classList.add('show'); }
+    return;
   }
 
-  if(!firebaseReady){ toast('Connecting to database...','info'); return; }
-  
+  if (!firebaseReady) { toast('Connecting to database...', 'info'); return; }
+
   try {
     const snap = await window._get(window._ref(window._db, 'users'));
-    let emailExists = false;
-    let phoneExists = false;
-    
-    if(snap.exists()){
-      snap.forEach(child=>{
+    let emailExists = false, phoneExists = false;
+    if (snap.exists()) {
+      snap.forEach(child => {
         const u = child.val();
-        if(u.email === email) emailExists = true;
-        if(u.number === phone) phoneExists = true;
+        if (u.email === email) emailExists = true;
+        if (u.number === phone) phoneExists = true;
       });
     }
-    
-    if(emailExists){
-      if(errorDiv) {
-        errorDiv.innerHTML = '❌ This email is already registered! Please use another email or login.';
-        errorDiv.classList.add('show');
-      }
+    if (emailExists) {
+      if (errorDiv) { errorDiv.innerHTML = '❌ This email is already registered!'; errorDiv.classList.add('show'); }
       return;
     }
-    
-    if(phoneExists){
-      if(errorDiv) {
-        errorDiv.innerHTML = '❌ This phone number is already registered! Please use another number or login.';
-        errorDiv.classList.add('show');
-      }
+    if (phoneExists) {
+      if (errorDiv) { errorDiv.innerHTML = '❌ This phone number is already registered!'; errorDiv.classList.add('show'); }
       return;
     }
-    
+
     const newRef = window._push(window._ref(window._db, 'users'));
     const userData = { name, email, number: phone, password: pass, gender: selectedGender };
     await window._set(newRef, userData);
     saveSession({ ...userData, key: newRef.key });
-    toast('Account created! Welcome '+name+' 🎉','success');
+    toast('Account created! Welcome ' + name + ' 🎉', 'success');
     showPage('homePage');
-  } catch(e){ 
-    if(errorDiv) {
-      errorDiv.innerHTML = '❌ Error: ' + e.message;
-      errorDiv.classList.add('show');
-    }
+  } catch (e) {
+    if (errorDiv) { errorDiv.innerHTML = '❌ Error: ' + e.message; errorDiv.classList.add('show'); }
   }
 }
 window.doSignup = doSignup;
 
-function doLogout(){
+function doLogout() {
   clearSession();
-  toast('Logged out successfully','success');
+  toast('Logged out successfully', 'success');
   showPage('homePage');
-  recordVisit(); // Record as guest after logout
+  // Guest হিসেবে visit update — user info আর attach হবে না নতুন visits এ
+  setTimeout(recordVisit, 500);
 }
 window.doLogout = doLogout;
 
-// APPS (same as before)
-function loadApps(){
-  if(!firebaseReady){ setTimeout(loadApps, 600); return; }
+// ============ APPS ============
+function loadApps() {
+  if (!firebaseReady) { setTimeout(loadApps, 600); return; }
   const grid = document.getElementById('appsGrid');
-  if(grid) grid.innerHTML = '<div class="spinner"></div>';
-  window._onValue(window._ref(window._db, 'apps'), snap=>{
+  if (grid) grid.innerHTML = '<div class="spinner"></div>';
+  window._onValue(window._ref(window._db, 'apps'), snap => {
     allApps = [];
-    if(snap.exists()){
-      snap.forEach(child=>{ allApps.push({key:child.key, ...child.val()}); });
+    if (snap.exists()) {
+      snap.forEach(child => { allApps.push({ key: child.key, ...child.val() }); });
     }
     renderApps(allApps);
   });
 }
 
-function getAppIconHtml(app){
-  if(app.imageUrl && app.imageUrl.startsWith('http')){
+function getAppIconHtml(app) {
+  if (app.imageUrl && app.imageUrl.startsWith('http')) {
     return `<img src="${escapeHtml(app.imageUrl)}" class="app-icon-img" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><div class="app-icon-emoji" style="display:none">${escapeHtml(app.icon || '📱')}</div>`;
-  } else {
-    return `<div class="app-icon-emoji">${escapeHtml(app.icon || '📱')}</div>`;
   }
+  return `<div class="app-icon-emoji">${escapeHtml(app.icon || '📱')}</div>`;
 }
 
-function getAverageRating(app){
-  if(!app.reviews || Object.keys(app.reviews).length === 0) return app.rating || 4.5;
-  let total = 0;
-  let count = 0;
-  for(let key in app.reviews){
-    if(app.reviews[key] && app.reviews[key].rating){
-      total += app.reviews[key].rating;
-      count++;
-    }
+function getAverageRating(app) {
+  if (!app.reviews || Object.keys(app.reviews).length === 0) return app.rating || 4.5;
+  let total = 0, count = 0;
+  for (let key in app.reviews) {
+    if (app.reviews[key] && app.reviews[key].rating) { total += app.reviews[key].rating; count++; }
   }
-  if(count === 0) return app.rating || 4.5;
+  if (count === 0) return app.rating || 4.5;
   return (total / count).toFixed(1);
 }
 
-function renderApps(apps){
+function renderApps(apps) {
   const grid = document.getElementById('appsGrid');
   const count = document.getElementById('appCount');
-  if(!grid) return;
-  if(count) count.textContent = apps.length + ' apps found';
-  if(!apps.length){
+  if (!grid) return;
+  if (count) count.textContent = apps.length + ' apps found';
+  if (!apps.length) {
     grid.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><div>No apps yet. Admin can add some!</div></div>`;
     return;
   }
-  grid.innerHTML = apps.map(app=>`<div class="app-card" onclick="openAppDetail('${app.key}')">${getAppIconHtml(app)}<div class="app-name">${escapeHtml(app.name)}</div><div class="app-category">${escapeHtml(app.category||'App')}</div><div class="app-rating">⭐ ${getAverageRating(app)} <span style="color:var(--text-dim);font-weight:400">| ${formatNum(app.downloads||0)} DL</span></div></div>`).join('');
+  grid.innerHTML = apps.map(app => `<div class="app-card" onclick="openAppDetail('${app.key}')">${getAppIconHtml(app)}<div class="app-name">${escapeHtml(app.name)}</div><div class="app-category">${escapeHtml(app.category || 'App')}</div><div class="app-rating">⭐ ${getAverageRating(app)} <span style="color:var(--text-dim);font-weight:400">| ${formatNum(app.downloads || 0)} DL</span></div></div>`).join('');
 }
 
-function filterApps(){
+function filterApps() {
   const q = document.getElementById('searchInput')?.value.toLowerCase() || '';
-  const filtered = q ? allApps.filter(a=>a.name.toLowerCase().includes(q) || (a.category||'').toLowerCase().includes(q) || (a.description||'').toLowerCase().includes(q)) : allApps;
+  const filtered = q ? allApps.filter(a => a.name.toLowerCase().includes(q) || (a.category || '').toLowerCase().includes(q) || (a.description || '').toLowerCase().includes(q)) : allApps;
   renderApps(filtered);
 }
 window.filterApps = filterApps;
 
-function formatNum(n){
-  if(n>=1000000) return (n/1000000).toFixed(1)+'M';
-  if(n>=1000) return (n/1000).toFixed(1)+'K';
+function formatNum(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
   return n;
 }
 
-async function addAutoReport(appName, userName, rating, comment){
-  if(!firebaseReady) return;
+async function addAutoReport(appName, userName, rating, comment) {
+  if (!firebaseReady) return;
   try {
-    const subject = appName;
-    const message = `${userName} gave ${rating} stars and commented: "${comment || 'No comment'}"`;
     const newReportRef = window._push(window._ref(window._db, 'reports'));
     await window._set(newReportRef, {
       username: userName,
       email: currentUser ? currentUser.email : '',
-      subject: subject,
-      message: message,
+      subject: appName,
+      message: `${userName} gave ${rating} stars and commented: "${comment || 'No comment'}"`,
       timestamp: Date.now(),
       type: 'auto_review'
     });
-  } catch(e){ console.error('Auto report error:', e); }
+  } catch (e) { console.error('Auto report error:', e); }
 }
 
-function openAppDetail(key){
-  const app = allApps.find(a=>a.key===key);
-  if(!app) return;
+// ============ APP DETAIL ============
+function openAppDetail(key) {
+  const app = allApps.find(a => a.key === key);
+  if (!app) return;
   currentAppId = key;
   const avgRating = getAverageRating(app);
   const reviews = app.reviews || {};
   const appName = app.name || 'App';
-  
+
   let userExistingReview = null;
   let userExistingRating = 0;
-  if(currentUser && currentUser.key){
-    for(let rid in reviews){
-      if(reviews[rid] && reviews[rid].userId === currentUser.key){
+  if (currentUser && currentUser.key) {
+    for (let rid in reviews) {
+      if (reviews[rid] && reviews[rid].userId === currentUser.key) {
         userExistingReview = reviews[rid];
         userExistingRating = reviews[rid].rating;
         break;
       }
     }
   }
-  
+
   selectedRatingValue = userExistingRating;
-  
+
   let reviewsHtml = '';
   let reviewCount = 0;
-  for(let rid in reviews){
-    if(reviews[rid]){
+  for (let rid in reviews) {
+    if (reviews[rid]) {
       const r = reviews[rid];
       reviewsHtml += `<div class="review-item">
         <div class="review-user">${escapeHtml(r.username || 'Anonymous')}</div>
-        <div class="review-rating">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</div>
+        <div class="review-rating">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
         <div class="review-text">${escapeHtml(r.comment || '')}</div>
         <div class="review-date">${new Date(r.date).toLocaleDateString()}</div>
       </div>`;
       reviewCount++;
     }
   }
-  
-  if(reviewCount === 0) reviewsHtml = '<div style="color:var(--text-dim);text-align:center;">No reviews yet. Be the first to review!</div>';
-  
-  const getStarClass = (starValue) => {
-    if(userExistingRating >= starValue) return 'active';
-    return '';
-  };
-  
+
+  if (reviewCount === 0) reviewsHtml = '<div style="color:var(--text-dim);text-align:center;">No reviews yet. Be the first to review!</div>';
+
+  const getStarClass = (v) => userExistingRating >= v ? 'active' : '';
+
   const content = document.getElementById('appDetailContent');
-  if(!content) return;
+  if (!content) return;
   content.innerHTML = `
     <div class="app-detail-icon">${getAppIconHtml(app)}</div>
     <div class="app-detail-name">${escapeHtml(app.name)}</div>
-    <div class="app-detail-category"><span class="chip">${escapeHtml(app.category||'App')}</span></div>
+    <div class="app-detail-category"><span class="chip">${escapeHtml(app.category || 'App')}</span></div>
     <div class="app-stats">
       <div class="app-stat"><div class="app-stat-value">⭐ ${avgRating}</div><div class="app-stat-label">Rating</div></div>
-      <div class="app-stat"><div class="app-stat-value">${formatNum(app.downloads||0)}</div><div class="app-stat-label">Downloads</div></div>
+      <div class="app-stat"><div class="app-stat-value">${formatNum(app.downloads || 0)}</div><div class="app-stat-label">Downloads</div></div>
       <div class="app-stat"><div class="app-stat-value">${reviewCount}</div><div class="app-stat-label">Reviews</div></div>
     </div>
-    <div class="app-desc">${escapeHtml(app.description||'No description available.')}</div>
-    <button class="btn btn-primary btn-full" onclick="downloadApp('${app.key}','${escapeHtml(app.link||'')}')">⬇️ Download Now</button>
+    <div class="app-desc">${escapeHtml(app.description || 'No description available.')}</div>
+    <button class="btn btn-primary btn-full" onclick="downloadApp('${app.key}','${escapeHtml(app.link || '')}')">⬇️ Download Now</button>
     
     <div class="rating-section">
       <div style="font-weight:600;margin-bottom:10px;">⭐ Rate this App</div>
@@ -1147,125 +1158,119 @@ function openAppDetail(key){
     </div>
   `;
   const overlay = document.getElementById('appDetailOverlay');
-  if(overlay) overlay.classList.remove('hidden');
+  if (overlay) overlay.classList.remove('hidden');
 }
 window.openAppDetail = openAppDetail;
 
-function setRating(rating){
+function setRating(rating) {
   selectedRatingValue = rating;
-  const stars = document.querySelectorAll('.star');
-  stars.forEach((star, i) => {
-    if(i < rating) star.classList.add('active');
+  document.querySelectorAll('.star').forEach((star, i) => {
+    if (i < rating) star.classList.add('active');
     else star.classList.remove('active');
   });
-  toast(`Selected ${rating} star rating!`,'success');
+  toast(`Selected ${rating} star rating!`, 'success');
 }
 window.setRating = setRating;
 
-async function submitReview(appName){
-  if(!currentUser){ toast('Please login to review!','error'); return; }
-  if(!selectedRatingValue || selectedRatingValue === 0){ toast('Please select a star rating first!','error'); return; }
+async function submitReview(appName) {
+  if (!currentUser) { toast('Please login to review!', 'error'); return; }
+  if (!selectedRatingValue) { toast('Please select a star rating first!', 'error'); return; }
   const comment = document.getElementById('reviewText')?.value.trim() || '';
-  
+
   try {
     const appRef = window._ref(window._db, `apps/${currentAppId}`);
     const appSnap = await window._get(appRef);
     const appData = appSnap.val();
     const existingReviews = appData.reviews || {};
     let existingReviewId = null;
-    
-    for(let rid in existingReviews){
-      if(existingReviews[rid] && existingReviews[rid].userId === currentUser.key){
+
+    for (let rid in existingReviews) {
+      if (existingReviews[rid] && existingReviews[rid].userId === currentUser.key) {
         existingReviewId = rid;
         break;
       }
     }
-    
-    if(existingReviewId){
-      const reviewRef = window._ref(window._db, `apps/${currentAppId}/reviews/${existingReviewId}`);
-      await window._update(reviewRef, { rating: selectedRatingValue, comment: comment, date: Date.now() });
-      toast('Your review has been updated! ✅','success');
-      await addAutoReport(appName, currentUser.name, selectedRatingValue, comment);
+
+    if (existingReviewId) {
+      await window._update(window._ref(window._db, `apps/${currentAppId}/reviews/${existingReviewId}`), { rating: selectedRatingValue, comment, date: Date.now() });
+      toast('Your review has been updated! ✅', 'success');
     } else {
-      const newReviewRef = window._push(window._ref(window._db, `apps/${currentAppId}/reviews`));
-      await window._set(newReviewRef, { userId: currentUser.key, username: currentUser.name, rating: selectedRatingValue, comment: comment, date: Date.now() });
-      toast('Review submitted! Thanks! 🎉','success');
-      await addAutoReport(appName, currentUser.name, selectedRatingValue, comment);
+      await window._set(window._push(window._ref(window._db, `apps/${currentAppId}/reviews`)), { userId: currentUser.key, username: currentUser.name, rating: selectedRatingValue, comment, date: Date.now() });
+      toast('Review submitted! Thanks! 🎉', 'success');
     }
-    
+
+    await addAutoReport(appName, currentUser.name, selectedRatingValue, comment);
     document.getElementById('reviewText').value = '';
     openAppDetail(currentAppId);
     loadApps();
-  } catch(e){ toast('Error: '+e.message,'error'); }
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
 }
 window.submitReview = submitReview;
 
-async function downloadApp(key, link){
-  if(!currentUser){ 
+async function downloadApp(key, link) {
+  if (!currentUser) {
     closeModal('appDetailOverlay');
-    showPage('authPage'); 
-    toast('Please login to download!','error'); 
-    return; 
+    showPage('authPage');
+    toast('Please login to download!', 'error');
+    return;
   }
   try {
     const appRef = window._ref(window._db, 'apps/' + key);
     await window._runTransaction(appRef, (currentData) => {
-      if(currentData) { currentData.downloads = (currentData.downloads || 0) + 1; }
+      if (currentData) { currentData.downloads = (currentData.downloads || 0) + 1; }
       return currentData;
     });
-    toast('Download started! 🚀','success');
-    if(link && link.startsWith('http')) window.open(link,'_blank');
-  } catch(e){ toast('Error updating downloads','error'); }
+    toast('Download started! 🚀', 'success');
+    if (link && link.startsWith('http')) window.open(link, '_blank');
+  } catch (e) { toast('Error updating downloads', 'error'); }
 }
 window.downloadApp = downloadApp;
 
-function closeAppDetail(e){ if(e && e.target === document.getElementById('appDetailOverlay')) closeModal('appDetailOverlay'); }
+function closeAppDetail(e) { if (e && e.target === document.getElementById('appDetailOverlay')) closeModal('appDetailOverlay'); }
 window.closeAppDetail = closeAppDetail;
 
-function openReport(){ document.getElementById('reportOverlay').classList.remove('hidden'); }
+function openReport() { document.getElementById('reportOverlay')?.classList.remove('hidden'); }
 window.openReport = openReport;
-function closeReportM(e){ if(e && e.target === document.getElementById('reportOverlay')) closeModal('reportOverlay'); }
+function closeReportM(e) { if (e && e.target === document.getElementById('reportOverlay')) closeModal('reportOverlay'); }
 window.closeReportM = closeReportM;
 
-async function sendReport(){
+async function sendReport() {
   const sub = document.getElementById('rSubject')?.value.trim();
   const msg = document.getElementById('rMsg')?.value.trim();
-  if(!sub||!msg){ toast('Please fill all fields!','error'); return; }
-  if(!firebaseReady){ toast('Connecting...','info'); return; }
-  const newRef = window._push(window._ref(window._db,'reports'));
-  await window._set(newRef, { 
-    username: currentUser ? currentUser.name : 'Anonymous', 
-    email: currentUser ? (currentUser.email||'') : '', 
+  if (!sub || !msg) { toast('Please fill all fields!', 'error'); return; }
+  if (!firebaseReady) { toast('Connecting...', 'info'); return; }
+  const newRef = window._push(window._ref(window._db, 'reports'));
+  await window._set(newRef, {
+    username: currentUser ? currentUser.name : 'Anonymous',
+    email: currentUser ? (currentUser.email || '') : '',
     subject: sub, message: msg, timestamp: Date.now(), type: 'user_report'
   });
-  toast('Report submitted! 🙏','success');
-  document.getElementById('rSubject').value='';
-  document.getElementById('rMsg').value='';
+  toast('Report submitted! 🙏', 'success');
+  document.getElementById('rSubject').value = '';
+  document.getElementById('rMsg').value = '';
   closeModal('reportOverlay');
 }
 window.sendReport = sendReport;
 
-function openAbout(){ document.getElementById('aboutOverlay').classList.remove('hidden'); }
+function openAbout() { document.getElementById('aboutOverlay')?.classList.remove('hidden'); }
 window.openAbout = openAbout;
-function closeAboutM(e){ if(e && e.target === document.getElementById('aboutOverlay')) closeModal('aboutOverlay'); }
+function closeAboutM(e) { if (e && e.target === document.getElementById('aboutOverlay')) closeModal('aboutOverlay'); }
 window.closeAboutM = closeAboutM;
 
-function closeModal(id){ const el = document.getElementById(id); if(el) el.classList.add('hidden'); }
+function closeModal(id) { const el = document.getElementById(id); if (el) el.classList.add('hidden'); }
 window.closeModal = closeModal;
 
-window.addEventListener('firebaseReady', ()=>{
+// ============ INIT ============
+window.addEventListener('firebaseReady', () => {
   firebaseReady = true;
-  console.log('Firebase connected');
+  console.log('Firebase connected ✅');
   loadApps();
-  loadWebsiteSettings();
+  loadWebsiteSettings(); // APK link load হবে Firebase থেকে
   recordVisit();
 });
 
-document.addEventListener('DOMContentLoaded', ()=>{
+document.addEventListener('DOMContentLoaded', () => {
   loadSession();
-  loadApps();
-  loadWebsiteSettings();
-  recordVisit();
 });
 </script>
 </body>
