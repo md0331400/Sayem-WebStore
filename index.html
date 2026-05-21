@@ -1148,7 +1148,7 @@ function openAppDetail(key) {
   for (let rid in reviews) {
     if (reviews[rid]) {
       const r = reviews[rid];
-      const src = r.source === 'report' ? '<span style="font-size:10px;color:var(--text-dim);background:rgba(255,100,100,0.12);border:1px solid rgba(255,100,100,0.3);padding:2px 7px;border-radius:99px;margin-left:6px;">Collected by Report us</span>' : '<span style="font-size:10px;color:var(--text-dim);background:var(--orange-dim);border:1px solid var(--border);padding:2px 7px;border-radius:99px;margin-left:6px;">Collected by review section</span>';
+      const src = '';
       reviewsHtml += `<div class="review-item">
         <div class="review-user" style="display:flex;align-items:center;flex-wrap:wrap;">${escapeHtml(r.username || 'Anonymous')}${src}</div>
         <div class="review-rating">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
