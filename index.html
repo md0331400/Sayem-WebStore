@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SamWeb Store | Apps & Games</title>
+  <meta name="description" content="Discover, review, and download apps and games with SamWeb Store.">
+  <meta name="keywords" content="SamWeb Store, apps, games, app store, downloads, Bangladesh">
+  <meta name="theme-color" content="#ff8a24">
+  <meta name="color-scheme" content="dark">
+  <meta name="application-name" content="SamWeb Store">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SamWeb Store">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no, email=no, address=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="SamWeb Store | Apps & Games">
+  <meta property="og:description" content="Browse apps, check screenshots and ratings, then download with confidence.">
+  <meta property="og:url" content="https://samva-app-store.firebaseapp.com/">
+  <meta property="og:image" content="https://samva-app-store.firebaseapp.com/icons/icon-512.png">
+  <meta property="og:site_name" content="SamWeb Store">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="SamWeb Store | Apps & Games">
+  <meta name="twitter:description" content="Browse apps, check screenshots and ratings, then download with confidence.">
+  <meta name="twitter:image" content="https://samva-app-store.firebaseapp.com/icons/icon-512.png">
+  <link rel="canonical" href="https://samva-app-store.firebaseapp.com/">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+  <link rel="preload" href="style.css" as="style">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+  <div id="particles" aria-hidden="true"></div>
+  <div id="toast" aria-live="polite" aria-atomic="true"></div>
+
+  <div id="homePage" class="page active">
+    <header class="site-header">
+      <div class="container nav-shell">
+        <button class="brand" onclick="scrollToTop()" aria-label="Go to top">
+          <span class="brand-mark">
+            <img id="headerLogoImg" src="icons/icon-192.png" alt="SamWeb Store logo">
+            <span id="headerLogoEmoji" class="brand-emoji hidden">🛒</span>
+          </span>
+          <span class="brand-copy">
+            <span class="brand-title" id="websiteName">SamWeb Store</span>
+            <span class="brand-subtitle">Apps, games, reviews & downloads</span>
+          </span>
+        </button>
+
+        <nav class="desktop-nav" aria-label="Primary navigation">
+          <button class="nav-link" onclick="navigateToSection('featuredSection')">Featured</button>
+          <button class="nav-link" onclick="navigateToSection('appsSection')">Apps</button>
+          <button class="nav-link" onclick="openReport()">Report</button>
+          <button class="nav-link" onclick="openAbout()">About</button>
+        </nav>
+
+        <div class="nav-actions">
+          <button id="headerLoginBtn" class="btn btn-outline nav-auth-btn" onclick="showPage('authPage')">Login</button>
+          <div class="header-user" id="headerUser" style="display:none"></div>
+          <button class="menu-btn" onclick="openMenu()" aria-label="Open menu">
+            <span></span><span></span><span></span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero-section">
+        <div class="container hero-grid compact-hero-grid">
+          <div class="hero-copy">
+            <span class="eyebrow">Trusted app collection</span>
+            <h1 class="hero-title">Download <span>apps &amp; games</span> without confusion.</h1>
+            <p class="hero-sub">Search your app, open its details page, check screenshots and ratings, then tap <strong>Download Now</strong>.</p>
+
+            <div class="search-panel glass-card">
+              <div class="search-wrap">
+                <input type="text" id="searchInput" placeholder="Search apps, categories, or descriptions..." oninput="filterApps()" autocomplete="off">
+                <span class="search-icon">⌕</span>
+              </div>
+              <div class="hero-actions clean-actions">
+                <button class="btn btn-primary" onclick="scrollToApps()">Explore Apps</button>
+                <button class="btn btn-ghost" onclick="openReport()">Send Feedback</button>
+              </div>
+              <p id="installHint" class="install-hint">Tip: Tap any app card to open details, screenshots, rating, and download button.</p>
+            </div>
+
+            <div id="categoryFilters" class="category-filters"></div>
+          </div>
+
+          <div class="hero-showcase">
+            <div class="glass-card showcase-card compact-showcase-card">
+              <div class="showcase-head">
+                <span class="showcase-badge">Popular right now</span>
+                <span class="showcase-badge subtle">Updated live</span>
+              </div>
+              <div class="showcase-device">
+                <div class="device-topbar">
+                  <span></span><span></span><span></span>
+                </div>
+                <div class="device-content" id="heroMiniList">
+                  <div class="mini-placeholder">Loading popular apps…</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="metric-grid compact-metric-grid">
+              <article class="metric-card">
+                <strong id="heroAppsCount">0</strong>
+                <span>Apps</span>
+              </article>
+              <article class="metric-card">
+                <strong id="heroDownloadsCount">0</strong>
+                <span>Downloads</span>
+              </article>
+              <article class="metric-card">
+                <strong id="heroRatingCount">0.0</strong>
+                <span>Average rating</span>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="trust-section">
+        <div class="container trust-grid">
+          <article class="trust-card glass-card">
+            <span class="trust-icon">🛡️</span>
+            <div>
+              <h2>Clean app pages</h2>
+              <p>Each app opens with screenshots, rating, description, and a clear download button.</p>
+            </div>
+          </article>
+          <article class="trust-card glass-card">
+            <span class="trust-icon">⚡</span>
+            <div>
+              <h2>Fast browsing</h2>
+              <p>Quick search, responsive layout, and smooth interaction across mobile and desktop.</p>
+            </div>
+          </article>
+          <article class="trust-card glass-card">
+            <span class="trust-icon">⭐</span>
+            <div>
+              <h2>Real user feedback</h2>
+              <p>See reviews before downloading and share your own experience after using an app.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-section container" id="featuredSection">
+        <div class="section-header section-header-wrap">
+          <div>
+            <p class="section-kicker">Featured</p>
+            <h2 class="section-title">Top picks</h2>
+          </div>
+          <div class="section-meta">Tap a card to open details</div>
+        </div>
+        <div id="featuredGrid" class="featured-grid">
+          <div class="empty-block">Featured apps will appear here when available.</div>
+        </div>
+      </section>
+
+      <section class="content-section container" id="appsSection">
+        <div class="section-header section-header-wrap">
+          <div>
+            <p class="section-kicker">Library</p>
+            <h2 class="section-title">All apps &amp; games</h2>
+          </div>
+          <div id="appCount" class="section-meta">0 apps available</div>
+        </div>
+        <div class="list-note glass-card">Choose any app below to view details and download safely.</div>
+        <div class="apps-grid" id="appsGrid">
+          <div class="spinner"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-grid">
+        <div class="footer-brand-block">
+          <div class="footer-brand">
+            <img src="icons/icon-192.png" alt="SamWeb Store icon">
+            <div>
+              <strong id="footerBrandName">SamWeb Store</strong>
+              <span>Simple, clear, and easy app downloads</span>
+            </div>
+          </div>
+          <p class="footer-copy">Search apps, open details, read reviews, and download with clarity from one clean place.</p>
+        </div>
+
+        <div class="footer-links">
+          <h3>Quick Links</h3>
+          <button class="footer-link" onclick="scrollToTop()">Home</button>
+          <button class="footer-link" onclick="scrollToApps()">All Apps</button>
+          <button class="footer-link" onclick="openReport()">Report Us</button>
+          <button class="footer-link" onclick="openAbout()">About</button>
+        </div>
+
+        <div class="footer-links">
+          <h3>How to Download</h3>
+          <span class="footer-note">1. Search your app</span>
+          <span class="footer-note">2. Open the details page</span>
+          <span class="footer-note">3. Tap “Download Now”</span>
+          <span class="footer-note">4. Login if required</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <div id="authPage" class="page auth-page">
+    <div class="auth-shell">
+      <div class="auth-panel glass-card auth-panel-copy">
+        <span class="eyebrow">Secure account access</span>
+        <h2>Login to download apps and post reviews.</h2>
+        <p>Create an account or sign in to rate apps, write reviews, and access downloads quickly.</p>
+        <div class="auth-benefits">
+          <div class="auth-benefit"><span>✓</span><span>Fast login and signup flow</span></div>
+          <div class="auth-benefit"><span>✓</span><span>Submit reviews and ratings</span></div>
+          <div class="auth-benefit"><span>✓</span><span>Responsive experience on every device</span></div>
+        </div>
+        <button class="btn btn-ghost" onclick="showPage('homePage')">← Back to Home</button>
+      </div>
+
+      <div class="auth-box glass-card">
+        <div class="auth-logo">
+          <img id="authLogoImg" src="icons/icon-192.png" alt="SamWeb Store logo">
+          <div id="authLogoIcon" class="auth-logo-icon hidden">🛒</div>
+          <div class="auth-logo-title">SamWeb Store</div>
+        </div>
+
+        <div class="auth-tabs">
+          <button class="auth-tab active" onclick="switchAuth('login')">Login</button>
+          <button class="auth-tab" onclick="switchAuth('signup')">Sign Up</button>
+        </div>
+
+        <div id="signupError" class="error-msg"></div>
+
+        <div class="auth-form active" id="loginForm">
+          <div class="input-group">
+            <label for="loginEmail">Email or Phone Number</label>
+            <input type="text" id="loginEmail" placeholder="Enter email or number">
+          </div>
+          <div class="input-group">
+            <label for="loginPass">Password</label>
+            <input type="password" id="loginPass" placeholder="Enter password">
+          </div>
+          <button class="btn btn-primary btn-full" onclick="doLogin()">🔑 Login</button>
+          <div class="auth-switch">Don't have an account? <a onclick="switchAuth('signup')">Sign Up</a></div>
+        </div>
+
+        <div class="auth-form" id="signupForm">
+          <div class="input-group">
+            <label for="signName">Full Name</label>
+            <input type="text" id="signName" placeholder="Your full name">
+          </div>
+          <div class="input-group">
+            <label for="signEmail">Email Address</label>
+            <input type="email" id="signEmail" placeholder="your@email.com">
+          </div>
+          <div class="input-group">
+            <label for="signPhone">Phone Number</label>
+            <input type="tel" id="signPhone" placeholder="+880...">
+          </div>
+          <div class="input-group">
+            <label>Gender</label>
+            <div class="gender-options">
+              <button type="button" class="gender-opt selected" onclick="selectGender('Male', this)">👨 Male</button>
+              <button type="button" class="gender-opt" onclick="selectGender('Female', this)">👩 Female</button>
+              <button type="button" class="gender-opt" onclick="selectGender('Other', this)">🌈 Other</button>
+            </div>
+          </div>
+          <div class="input-group">
+            <label for="signPass">Password</label>
+            <input type="password" id="signPass" placeholder="Create password (min 6 chars)">
+          </div>
+          <button class="btn btn-primary btn-full" onclick="doSignup()">✨ Create Account</button>
+          <div class="auth-switch">Already have an account? <a onclick="switchAuth('login')">Login</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side-overlay" id="sideOverlay" onclick="closeMenu()"></div>
+  <aside class="side-menu" id="sideMenu" aria-label="Mobile menu">
+    <div class="side-menu-header">
+      <div class="side-menu-logo">SamWeb Store</div>
+      <button class="close-btn" onclick="closeMenu()">✕</button>
+    </div>
+    <nav class="side-menu-nav" id="sideNav"></nav>
+    <div class="side-menu-footer" id="sideFooter"></div>
+  </aside>
+
+  <div class="overlay hidden" id="appDetailOverlay" onclick="closeAppDetail(event)">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <span class="modal-title">App Details</span>
+        <button class="close-btn" onclick="closeModal('appDetailOverlay')">✕</button>
+      </div>
+      <div id="appDetailContent"></div>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="reportOverlay" onclick="closeReportM(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Report Us</span>
+        <button class="close-btn" onclick="closeModal('reportOverlay')">✕</button>
+      </div>
+      <p class="modal-subtext">Have a problem, bug report, or suggestion? Tell us what happened.</p>
+      <div class="input-group">
+        <label for="rSubject">Subject</label>
+        <input type="text" id="rSubject" placeholder="What's the issue?">
+      </div>
+      <div class="input-group">
+        <label for="rMsg">Message</label>
+        <textarea id="rMsg" placeholder="Describe the issue in detail..."></textarea>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="sendReport()">🚀 Submit Report</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="aboutOverlay" onclick="closeAboutM(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">About SamWeb Store</span>
+        <button class="close-btn" onclick="closeModal('aboutOverlay')">✕</button>
+      </div>
+      <div class="about-top">
+        <img id="aboutLogoImg" src="icons/icon-192.png" alt="SamWeb Store logo">
+        <div id="aboutLogoEmoji" class="about-avatar hidden">🛒</div>
+        <div>
+          <h3>SamWeb Store</h3>
+          <p>Apps &amp; Games Download Platform</p>
+        </div>
+      </div>
+      <div class="about-info-row"><div class="about-info-label">Creator</div><div class="about-info-value">Md. Abu Sayem (amisayem)</div></div>
+      <div class="about-info-row"><div class="about-info-label">Address</div><div class="about-info-value">Bangladesh 🇧🇩</div></div>
+      <div class="about-info-row"><div class="about-info-label">Email</div><div class="about-info-value"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="bbdad9cec8dac2ded68b838d8dfbdcd6dad2d795d8d4d6">[email&#160;protected]</a></div></div>
+      <div class="about-info-row"><div class="about-info-label">Version</div><div class="about-info-value"><span class="chip">v5.0.1</span></div></div>
+      <div class="about-box">
+        SamWeb Store helps users discover apps, check details, read reviews, and download more clearly from one simple interface.
+      </div>
+    </div>
+  </div>
+
+  <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script type="module" src="app.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a023774dac36ded3',t:'MTc3OTg2ODYxNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
