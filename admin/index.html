@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+  <title>SamWeb Store • Admin Panel</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --orange: #FF8C42; --orange-light: #FFB366; --orange-glow: rgba(255,140,66,0.35); --orange-dim: rgba(255,160,66,0.12);
+      --black: #0a0a0a; --dark: #111111; --card: #161616; --card2: #1c1c1c; --border: rgba(255,140,66,0.22);
+      --text: #f0f0f0; --text-dim: #999; --glass: rgba(255,255,255,0.04);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: 'Exo 2', sans-serif; background: var(--black); color: var(--text); min-height: 100vh; }
+    .hidden { display: none !important; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; border: none; border-radius: 8px; font-family: 'Exo 2', sans-serif; font-weight: 600; font-size: 14px; cursor: pointer; transition: all .25s ease; }
+    .btn-primary { background: linear-gradient(135deg, var(--orange), var(--orange-light)); color: #000; box-shadow: 0 0 12px var(--orange-glow); }
+    .btn-primary:hover { transform: translateY(-2px); }
+    .btn-outline { background: transparent; color: var(--orange); border: 1.5px solid var(--orange); }
+    .btn-outline:hover { background: var(--orange-dim); }
+    .btn-danger { background: rgba(255,60,60,0.12); color: #ff6b6b; border: 1px solid rgba(255,60,60,0.3); }
+    .btn-danger:hover { background: rgba(255,60,60,0.22); }
+    .btn-warning { background: rgba(255,200,50,0.15); color: #ffc832; border: 1px solid rgba(255,200,50,0.35); }
+    .btn-warning:hover { background: rgba(255,200,50,0.25); }
+    .btn-success { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.35); }
+    .btn-success:hover { background: rgba(34,197,94,0.25); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .btn-xs { padding: 4px 10px; font-size: 11px; border-radius: 6px; }
+    .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .input-group label { font-size: 13px; color: var(--text-dim); font-weight: 500; }
+    .input-group input, .input-group select, .input-group textarea {
+      background: var(--card2); border: 1.5px solid var(--border); color: var(--text);
+      padding: 12px 14px; border-radius: 8px; font-family: 'Exo 2', sans-serif; font-size: 14px;
+      outline: none; width: 100%;
+    }
+    .input-group input::placeholder, .input-group textarea::placeholder { color: #555; }
+    .input-group input:focus, .input-group select:focus, .input-group textarea:focus { border-color: var(--orange); }
+    .input-group textarea { font-family: monospace; font-size: 12px; }
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 12px 24px; border-radius: 99px; font-size: 14px; z-index: 9999; transition: all .3s ease; white-space: nowrap; pointer-events: none; }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.success { border-color: #4ade80; color: #4ade80; }
+    #toast.error { border-color: #f87171; color: #f87171; }
+    .header { position: sticky; top: 0; z-index: 100; background: rgba(10,10,10,0.85); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); padding: 0 20px; height: 60px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .header-logo { display: flex; align-items: center; gap: 10px; font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; color: var(--orange); }
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    .admin-container { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
+    .admin-header { background: linear-gradient(135deg, rgba(255,140,66,0.15), rgba(255,140,66,0.05)); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .admin-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px; }
+    @media(max-width:900px){ .admin-stats { grid-template-columns: repeat(2, 1fr); } }
+    .stat-card { background: var(--card2); border-radius: 8px; padding: 12px 14px; text-align: center; min-width: 0; border: 1px solid transparent; }
+    .stat-card.stat-highlight { border-color: var(--orange); background: linear-gradient(135deg, rgba(255,140,66,0.18), rgba(255,140,66,0.06)); }
+    .stat-number { font-size: 24px; font-weight: 700; color: var(--orange); }
+    .stat-label { font-size: 11px; color: var(--text-dim); }
+    .admin-tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; background: var(--card); padding: 6px; border-radius: 10px; border: 1px solid var(--border); }
+    .admin-tab { padding: 8px 16px; background: transparent; border: none; color: var(--text-dim); border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all .2s; font-family: 'Exo 2', sans-serif; }
+    .admin-tab.active { background: var(--orange); color: #000; }
+    .admin-panel { display: none; }
+    .admin-panel.active { display: block; }
+    .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .dashboard-grid .span-2 { grid-column: 1 / -1; }
+    @media(max-width:768px){ .dashboard-grid { grid-template-columns: 1fr; } }
+    .dash-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .dash-card-title { font-weight: 700; font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; color: var(--orange); flex-wrap: wrap; gap: 8px; }
+    .visitor-list, .activity-list { display: flex; flex-direction: column; gap: 8px; max-height: 350px; overflow-y: auto; }
+    .visitor-item, .activity-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--card2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); font-size: 13px; cursor: pointer; transition: all .2s; }
+    .visitor-item:hover { background: var(--orange-dim); border-color: var(--orange); }
+    .visitor-info, .activity-info { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
+    .visitor-name { font-weight: 600; font-size: 13px; }
+    .visitor-detail { color: var(--text-dim); font-size: 11px; }
+    .visitor-time { font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+    .badge { padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+    .badge.user { background: var(--orange-dim); color: var(--orange); }
+    .badge.guest { background: #333; color: #aaa; }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .overlay.hidden { display: none !important; }
+    .modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 100%; max-width: 650px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 32px rgba(0,0,0,0.8); }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    .modal-title { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; color: var(--orange); }
+    .modal-close-btn { background: var(--glass); border: 1px solid rgba(255,255,255,0.08); color: var(--text-dim); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
+    .detail-label { color: var(--text-dim); min-width: 120px; }
+    .detail-value { font-weight: 500; text-align: right; word-break: break-all; }
+    .history-timeline { position: relative; padding-left: 20px; }
+    .history-timeline::before { content: ''; position: absolute; left: 6px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+    .history-item { position: relative; padding: 10px 0 10px 20px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+    .history-item::before { content: ''; position: absolute; left: -17px; top: 16px; width: 8px; height: 8px; border-radius: 50%; background: var(--orange); }
+    .history-time { font-size: 11px; color: var(--orange); font-weight: 600; margin-bottom: 4px; }
+    .history-details { display: flex; flex-wrap: wrap; gap: 6px; }
+    .history-badge { font-size: 9px; padding: 2px 6px; border-radius: 4px; background: var(--card2); color: var(--text-dim); border: 1px solid rgba(255,255,255,0.05); }
+    .confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .confirm-overlay.hidden { display: none !important; }
+    .confirm-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; max-width: 400px; width: 90%; text-align: center; }
+    .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--orange); border-radius: 50%; animation: spin .8s linear infinite; margin: 20px auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .login-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+    .login-box { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 32px; width: 100%; max-width: 380px; }
+    .login-logo { text-align: center; margin-bottom: 24px; font-family: 'Rajdhani', sans-serif; font-size: 24px; font-weight: 700; color: var(--orange); }
+    ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: var(--dark); } ::-webkit-scrollbar-thumb { background: var(--orange); border-radius: 4px; }
+
+    /* ---------- Ads Manager ---------- */
+    .ad-card-admin { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+    .ad-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .ad-name { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .ad-status { font-size: 10px; padding: 2px 10px; border-radius: 99px; font-weight: 700; }
+    .ad-status.on { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.35); }
+    .ad-status.off { background: rgba(255,100,100,0.12); color: #f87171; border: 1px solid rgba(255,100,100,0.3); }
+    .ad-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+    .ad-code-preview { background: var(--black); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 10px 12px; font-family: monospace; font-size: 11px; color: #7dd3a6; word-break: break-all; margin-top: 10px; max-height: 84px; overflow-y: auto; white-space: pre-wrap; }
+    .ad-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+    .slot-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .slot-chip { font-size: 10px; padding: 3px 10px; border-radius: 99px; background: var(--orange-dim); color: var(--orange); border: 1px solid var(--border); font-weight: 600; }
+    .slot-pick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    @media(max-width:640px){ .slot-pick-grid { grid-template-columns: 1fr; } }
+    .slot-pick { display: flex; gap: 10px; align-items: flex-start; background: var(--card2); border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px; cursor: pointer; transition: all .2s; }
+    .slot-pick:hover { border-color: var(--orange); }
+    .slot-pick input { margin-top: 3px; accent-color: var(--orange); width: 16px; height: 16px; flex-shrink: 0; }
+    .slot-pick-name { font-size: 13px; font-weight: 600; }
+    .slot-pick-desc { font-size: 11px; color: var(--text-dim); }
+    .switch { position: relative; display: inline-block; width: 42px; height: 22px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track { position: absolute; cursor: pointer; inset: 0; background: #333; border: 1px solid rgba(255,255,255,0.12); border-radius: 99px; transition: .2s; }
+    .switch .track::before { content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px; background: #888; border-radius: 50%; transition: .2s; }
+    .switch input:checked + .track { background: rgba(34,197,94,0.25); border-color: rgba(34,197,94,0.5); }
+    .switch input:checked + .track::before { transform: translateX(20px); background: #22c55e; }
+    .impressions-badge { font-size: 11px; color: var(--text); background: var(--card2); border: 1px solid var(--border); padding: 3px 10px; border-radius: 99px; font-weight: 700; }
+    .impressions-badge b { color: var(--orange); }
+    .slot-stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .slot-stat { background: var(--card2); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 8px 12px; font-size: 11px; color: var(--text-dim); }
+    .slot-stat b { display: block; font-size: 16px; color: var(--orange); }
+    .note-box { background: var(--card2); border: 1px dashed var(--border); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- CONFIRMATION DIALOG -->
+<div class="confirm-overlay hidden" id="confirmOverlay">
+  <div class="confirm-box">
+    <div style="font-size:40px;margin-bottom:10px;">⚠️</div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:6px;" id="confirmTitle">Confirm</div>
+    <div style="color:var(--text-dim);font-size:13px;" id="confirmMsg">Are you sure?</div>
+    <div style="display:flex;gap:10px;margin-top:20px;justify-content:center;">
+      <button class="btn btn-outline btn-sm" id="btnConfirmCancel">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="confirmYesBtn">Yes, Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="loginPage" class="login-container">
+  <div class="login-box">
+    <div class="login-logo">⚙️ SamWeb Admin</div>
+    <div class="input-group">
+      <label>Username / Email</label>
+      <input type="text" id="adminUser" placeholder="Enter username or email">
+    </div>
+    <div class="input-group">
+      <label>Password</label>
+      <input type="password" id="adminPass" placeholder="Enter password" onkeydown="if(event.key==='Enter')doAdminLogin()">
+    </div>
+    <button class="btn btn-primary" style="width:100%;" id="btnLogin">🔐 Login</button>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="adminDashboard" style="display:none;">
+  <header class="header">
+    <div class="header-logo">⚙️ SamWeb Admin</div>
+    <div class="header-actions">
+      <a class="btn btn-outline btn-sm" href="../" target="_blank" rel="noopener" style="text-decoration:none;">🌐 View Website</a>
+      <button class="btn btn-outline btn-sm" id="btnLogout">🚪 Logout</button>
+    </div>
+  </header>
+  <div class="admin-container">
+    <div class="admin-header">
+      <div style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700;">Dashboard</div>
+      <div class="admin-stats">
+        <div class="stat-card"><div class="stat-number" id="totalUsers">0</div><div class="stat-label">Users</div></div>
+        <div class="stat-card"><div class="stat-number" id="totalApps">0</div><div class="stat-label">Apps</div></div>
+        <div class="stat-card"><div class="stat-number" id="totalReports">0</div><div class="stat-label">Reports</div></div>
+        <div class="stat-card"><div class="stat-number" id="totalVisitors">0</div><div class="stat-label">Visitors</div></div>
+        <div class="stat-card"><div class="stat-number" id="totalDownloads">0</div><div class="stat-label">Downloads</div></div>
+        <div class="stat-card"><div class="stat-number" id="totalReviews">0</div><div class="stat-label">Reviews</div></div>
+        <div class="stat-card stat-highlight"><div class="stat-number" id="totalImpressions">0</div><div class="stat-label">🎯 Total Ad Impressions</div></div>
+        <div class="stat-card"><div class="stat-number" id="todayImpressions">0</div><div class="stat-label">Impressions Today</div></div>
+      </div>
+    </div>
+
+    <div class="admin-tabs" id="adminTabs">
+      <button class="admin-tab active" data-panel="dashboard">📊 Dashboard</button>
+      <button class="admin-tab" data-panel="addApp">➕ Add App</button>
+      <button class="admin-tab" data-panel="appsList">📋 Apps</button>
+      <button class="admin-tab" data-panel="usersList">👥 Users</button>
+      <button class="admin-tab" data-panel="reportsPanel">📊 Reports</button>
+      <button class="admin-tab" data-panel="adsPanel">🎯 Ads Manager</button>
+      <button class="admin-tab" data-panel="settings">⚙️ Settings</button>
+    </div>
+
+    <div class="admin-panel active" id="dashboard">
+      <div class="dashboard-grid">
+        <div class="dash-card">
+          <div class="dash-card-title">
+            <span>👥 Visitors (Click to view)</span>
+            <button class="btn btn-warning btn-xs" id="btnClearAllVisitors">🗑 Clear All</button>
+          </div>
+          <div class="visitor-list" id="visitorListContainer"><div class="spinner"></div></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-title">
+            <span>📋 Activity Log</span>
+            <button class="btn btn-warning btn-xs" id="btnClearAllActivity">🗑 Clear All</button>
+          </div>
+          <div class="activity-list" id="activityLogContainer"><div class="spinner"></div></div>
+        </div>
+        <div class="dash-card span-2">
+          <div class="dash-card-title"><span>🎯 Ad Impressions — per ad</span><button class="btn btn-outline btn-xs" onclick="loadAdsPanel();showPanel('adsPanel');">Open Ads Manager →</button></div>
+          <div id="adLeadersContainer"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-panel" id="addApp">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;">
+        <div style="font-weight:700;font-size:16px;margin-bottom:14px;">➕ Add App</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="input-group" style="margin-bottom:10px;"><label>Name *</label><input id="aName" placeholder="App name"></div>
+          <div class="input-group" style="margin-bottom:10px;"><label>Category</label>
+            <select id="aCategory">
+              <option>Social</option><option>Games</option><option>Tools</option>
+              <option>Entertainment</option><option>Other</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="input-group" style="margin-bottom:10px;"><label>Icon (Emoji)</label><input id="aIcon" value="📱" placeholder="📱"></div>
+          <div class="input-group" style="margin-bottom:10px;"><label>Image URL</label><input id="aImageUrl" placeholder="https://example.com/image.png"></div>
+        </div>
+        <div class="input-group" style="margin-bottom:10px;"><label>Download Link</label><input id="aLink" placeholder="https://play.google.com/..."></div>
+        <div class="input-group" style="margin-bottom:10px;"><label>Description *</label><textarea id="aDesc" rows="2" placeholder="Describe the app..."></textarea></div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📸 App Screenshots (optional)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 1</label><input id="aScreen1" placeholder="https://..."></div>
+          <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 2</label><input id="aScreen2" placeholder="https://..."></div>
+          <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 3</label><input id="aScreen3" placeholder="https://..."></div>
+          <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 4</label><input id="aScreen4" placeholder="https://..."></div>
+          <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 5</label><input id="aScreen5" placeholder="https://..."></div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btnAddApp">➕ Add App</button>
+      </div>
+    </div>
+
+    <div class="admin-panel" id="appsList">
+      <div style="font-weight:700;font-size:18px;margin-bottom:16px;">📋 Apps</div>
+      <div id="adminAppsList"><div class="spinner"></div></div>
+    </div>
+
+    <div class="admin-panel" id="usersList">
+      <div style="font-weight:700;font-size:18px;margin-bottom:16px;">👥 Users</div>
+      <div id="adminUsersList"><div class="spinner"></div></div>
+    </div>
+
+    <div class="admin-panel" id="reportsPanel">
+      <div style="font-weight:700;font-size:18px;margin-bottom:16px;">📊 Reports</div>
+      <div id="adminReportsList"><div class="spinner"></div></div>
+    </div>
+
+    <!-- ============ ADS MANAGER ============ -->
+    <div class="admin-panel" id="adsPanel">
+      <div style="font-weight:700;font-size:18px;margin-bottom:16px;">🎯 Ads Manager</div>
+
+      <div class="dash-card" style="margin-bottom:16px;">
+        <div class="dash-card-title"><span>📈 Impressions Overview</span>
+          <button class="btn btn-outline btn-xs" id="btnRefreshAds">🔄 Refresh</button>
+        </div>
+        <div class="admin-stats" style="margin-top:0;">
+          <div class="stat-card stat-highlight"><div class="stat-number" id="adsTotalImpressions">0</div><div class="stat-label">Total Impressions</div></div>
+          <div class="stat-card"><div class="stat-number" id="adsTodayImpressions">0</div><div class="stat-label">Today</div></div>
+          <div class="stat-card"><div class="stat-number" id="adsActiveCount">0</div><div class="stat-label">Active Ads</div></div>
+        </div>
+        <div style="margin-top:14px;">
+          <div style="font-size:12px;color:var(--text-dim);font-weight:600;margin-bottom:8px;">📍 Impressions per placement</div>
+          <div class="slot-stats-grid" id="slotStatsGrid"></div>
+        </div>
+      </div>
+
+      <div class="dash-card" style="margin-bottom:16px;">
+        <div class="dash-card-title"><span>⚙️ Placement Rules</span></div>
+        <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+          <div class="input-group" style="margin-bottom:0;max-width:280px;">
+            <label>Max ads per slot (এক জায়গায় সর্বোচ্চ কতগুলো ad বসবে)</label>
+            <select id="maxPerSlotSelect">
+              <option value="1">1 ad per slot</option>
+              <option value="2" selected>2 ads per slot</option>
+              <option value="3">3 ads per slot</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btnSaveMaxPerSlot" style="margin-bottom:2px;">💾 Save Rule</button>
+        </div>
+      </div>
+
+      <div class="dash-card" style="margin-bottom:16px;">
+        <div class="dash-card-title"><span>➕ Add New Ad</span></div>
+        <div class="input-group"><label>Ad Name (শুধু আপনার চেনার জন্য)</label><input id="newAdName" placeholder="e.g. Social Bar / Banner 728x90"></div>
+        <div class="input-group">
+          <label>Ad Code (ad network এর দেওয়া full code এখানে paste করুন)</label>
+          <textarea id="newAdCode" rows="4" placeholder="&lt;script src=&quot;https://example.com/ad.js&quot;&gt;&lt;/script&gt;"></textarea>
+        </div>
+        <div style="font-size:12px;color:var(--text-dim);font-weight:600;margin-bottom:8px;">📍 কোথায় কোথায় এই ad বসবে — placements সিলেক্ট করুন:</div>
+        <div class="slot-pick-grid" id="newAdSlots"></div>
+        <button class="btn btn-primary btn-sm" id="btnAddAd">➕ Add Ad</button>
+      </div>
+
+      <div class="note-box" style="margin-bottom:16px;">
+        💡 <b>Tips:</b> প্রতিটি ad এর পাশে switch দিয়ে চাইলে ad টা temporarily off রাখতে পারবেন (delete না করেই)।
+        <b>Floating / Social Bar</b> placement টা পুরো website এ চলে — social bar, popunder বা sticky ad এর জন্য।
+        Code change করলে ✏️ Edit এ click করুন। সব পরিবর্তন website এ সাথে সাথে live হয়ে যায়।
+      </div>
+
+      <div style="font-weight:700;font-size:15px;margin-bottom:10px;">📋 Your Ads</div>
+      <div id="adminAdsList"><div class="spinner"></div></div>
+    </div>
+
+    <!-- ============ SETTINGS ============ -->
+    <div class="admin-panel" id="settings">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px;">
+        <div style="font-weight:700;font-size:18px;margin-bottom:16px;">🔐 Admin Credentials</div>
+        <div class="input-group"><label>Current Password</label><input type="password" id="currentAdminPass" placeholder="Enter current password"></div>
+        <div class="input-group"><label>New Username</label><input id="newAdminUser" placeholder="Leave blank to keep current"></div>
+        <div class="input-group"><label>New Password</label><input type="password" id="newAdminPass" placeholder="Leave blank to keep current"></div>
+        <button class="btn btn-primary" id="btnUpdateAdmin">Update Credentials</button>
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px;">
+        <div style="font-weight:700;font-size:18px;margin-bottom:16px;">🌐 Website Settings</div>
+        <div class="input-group"><label>Website Name</label><input id="websiteNameInput" value="SamWeb Store" placeholder="SamWeb Store"></div>
+        <div class="input-group">
+          <label>Website Logo Image URL</label>
+          <input id="logoUrlInput" placeholder="https://example.com/logo.png" type="url">
+          <div id="logoPreviewWrap" style="display:none;margin-top:8px;"><img id="logoPreview" style="max-width:72px;max-height:72px;border-radius:12px;border:1px solid var(--border);" src="" alt="Logo Preview"></div>
+        </div>
+        <button class="btn btn-primary" id="btnSaveSettings">💾 Save Settings</button>
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;">
+        <div style="font-weight:700;font-size:18px;margin-bottom:10px;">📲 App Download</div>
+        <div class="note-box">
+          ✅ Website টা এখন সম্পূর্ণ <b>PWA</b> — user রা browser থেকেই "Install App" করে নিতে পারে।
+          আলাদা APK download system remove করে দেওয়া হয়েছে, তাই এখানে আর কোনো APK link section নেই।
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT APP MODAL -->
+<div class="overlay hidden" id="editAppOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Edit App</span>
+      <button class="modal-close-btn" data-close="editAppOverlay">✕</button>
+    </div>
+    <div id="editAppContent"></div>
+  </div>
+</div>
+
+<!-- EDIT AD MODAL -->
+<div class="overlay hidden" id="editAdOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Edit Ad</span>
+      <button class="modal-close-btn" data-close="editAdOverlay">✕</button>
+    </div>
+    <div id="editAdContent"></div>
+  </div>
+</div>
+
+<!-- VISITOR DETAIL MODAL -->
+<div class="overlay hidden" id="visitorDetailOverlay">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <span class="modal-title">👤 Visitor Details</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-warning btn-xs" id="btnClearHistory">🗑 Clear History</button>
+        <button class="btn btn-danger btn-xs" id="btnDeleteVisitor">❌ Delete</button>
+        <button class="modal-close-btn" data-close="visitorDetailOverlay">✕</button>
+      </div>
+    </div>
+    <div id="visitorDetailContent"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import{getDatabase,ref,push,set,get,remove,update}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+const firebaseConfig={
+  apiKey:"AIzaSyDo4VtvFjkHK_qPKw_8OvjWB3DF93m0_vE",
+  authDomain:"samva-app-store.firebaseapp.com",
+  databaseURL:"https://samva-app-store-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"samva-app-store",
+  storageBucket:"samva-app-store.firebasestorage.app",
+  messagingSenderId:"42570449631",
+  appId:"1:42570449631:web:0c81be27dc888a97db9f6a"
+};
+const app=initializeApp(firebaseConfig);
+const db=getDatabase(app);
+window._db=db;window._ref=ref;window._push=push;window._set=set;window._get=get;window._remove=remove;window._update=update;
+window.dispatchEvent(new Event('firebaseReady'));
+</script>
+
+<script>
+// ============ STATE ============
+let firebaseReady = false, currentAdminKey = null, allVisitorsData = [], currentVisitorKey = null;
+let confirmCallback = null;
+let cachedAds = [], cachedAdStats = {};
+
+// ============ AD PLACEMENT MAP ============
+const AD_SLOTS = [
+  { id: 'home_top',      name: '🏠 Home · Top',            desc: 'Featured banner এর ঠিক নিচে' },
+  { id: 'home_mid',      name: '🏠 Home · Middle',         desc: 'Featured Picks ও All Apps এর মাঝে' },
+  { id: 'home_bottom',   name: '🏠 Home · Bottom',         desc: 'Footer এর ঠিক উপরে' },
+  { id: 'games_top',     name: '🎮 Games Page · Top',      desc: 'Games পেজের শুরুতে' },
+  { id: 'apps_top',      name: '📱 Apps Page · Top',       desc: 'Apps পেজের শুরুতে' },
+  { id: 'detail_bottom', name: '📄 App Details · Bottom',  desc: 'App details পেজের একদম নিচে' },
+  { id: 'floating',      name: '🎈 Floating / Social Bar', desc: 'পুরো সাইটে চলে — social bar / sticky / popunder এর জন্য' }
+];
+
+// পূর্বের hard-coded social bar ad — প্রথমবার Ads Manager খুললে এটা auto-seed হয়ে যাবে
+const DEFAULT_AD = {
+  name: 'Social Bar (effectivecpmnetwork)',
+  code: '<script src="https://pl30953956.effectivecpmnetwork.com/6b/e0/7d/6be07d26bb1585e42fa3eafbebc5a187.js"><\/script>',
+  placements: ['floating'],
+  enabled: true
+};
+
+// ============ HELPERS ============
+function toast(m, t = 'info') {
+  const e = document.getElementById('toast');
+  if (!e) return;
+  e.textContent = m; e.className = 'show ' + t;
+  clearTimeout(e._timeout);
+  e._timeout = setTimeout(() => { if (e) e.className = ''; }, 2800);
+}
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function formatNum(n) {
+  n = Number(n) || 0;
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+function getLocalDayKey() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+}
+function slotLabel(id) {
+  const s = AD_SLOTS.find(x => x.id === id);
+  return s ? s.name : id;
+}
+
+// ============ CONFIRM DIALOG ============
+function showConfirm(title, msg, cb) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent = msg;
+  confirmCallback = cb;
+  document.getElementById('confirmOverlay').classList.remove('hidden');
+}
+function closeConfirm() {
+  document.getElementById('confirmOverlay').classList.add('hidden');
+  confirmCallback = null;
+}
+function executeConfirm() {
+  if (confirmCallback) {
+    const cb = confirmCallback;
+    confirmCallback = null;
+    closeConfirm();
+    cb();
+  }
+}
+
+// ============ MODAL ============
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.add('hidden');
+}
+
+// ============ ACTIVITY LOG ============
+async function logActivity(action, detail = '') {
+  if (!firebaseReady || !currentAdminKey) return;
+  try {
+    const newRef = window._push(window._ref(window._db, 'adminActivity'));
+    await window._set(newRef, {
+      action, detail, timestamp: Date.now(), adminKey: currentAdminKey
+    });
+    loadActivity();
+  } catch (e) { console.error('Activity log error:', e); }
+}
+
+// ============ EVENT DELEGATION ============
+document.addEventListener('click', function (e) {
+  const target = e.target;
+  const id = target.id;
+
+  if (id === 'btnConfirmCancel' || target.closest('#btnConfirmCancel')) { closeConfirm(); return; }
+  if (id === 'confirmYesBtn' || target.closest('#confirmYesBtn')) { executeConfirm(); return; }
+
+  const closeBtn = target.closest('[data-close]');
+  if (closeBtn) { closeModal(closeBtn.getAttribute('data-close')); return; }
+
+  if (target.classList.contains('overlay')) { closeModal(target.id); return; }
+
+  const tab = target.closest('.admin-tab');
+  if (tab) {
+    const panelId = tab.getAttribute('data-panel');
+    if (panelId) showPanel(panelId);
+    return;
+  }
+
+  const visitorItem = target.closest('.visitor-item');
+  if (visitorItem) {
+    const vk = visitorItem.getAttribute('data-visitor-key');
+    if (vk) showVisitorDetail(vk);
+    return;
+  }
+
+  if (id === 'btnClearHistory' || target.closest('#btnClearHistory')) {
+    if (!currentVisitorKey) { toast('No visitor selected', 'error'); return; }
+    showConfirm('Clear History?', 'Delete all visit history entries for this visitor?', async () => {
+      try {
+        await window._remove(window._ref(window._db, `visitors/${currentVisitorKey}/visitHistory`));
+        toast('✅ History cleared!', 'success');
+        await logActivity('🗑 Cleared Visitor History');
+        showVisitorDetail(currentVisitorKey);
+        loadVisitors();
+        updateStats();
+      } catch (e) { toast('Error: ' + e.message, 'error'); }
+    });
+    return;
+  }
+
+  if (id === 'btnDeleteVisitor' || target.closest('#btnDeleteVisitor')) {
+    if (!currentVisitorKey) { toast('No visitor selected', 'error'); return; }
+    showConfirm('Delete Visitor?', 'Permanently delete this visitor and all their data?', async () => {
+      try {
+        const oldKey = currentVisitorKey;
+        await window._remove(window._ref(window._db, `visitors/${oldKey}`));
+        toast('✅ Visitor deleted!', 'success');
+        currentVisitorKey = null;
+        closeModal('visitorDetailOverlay');
+        await logActivity('🗑 Deleted Visitor', oldKey.substring(0, 12) + '...');
+        loadVisitors();
+        updateStats();
+      } catch (e) { toast('Error: ' + e.message, 'error'); }
+    });
+    return;
+  }
+
+  if (id === 'btnClearAllVisitors' || target.closest('#btnClearAllVisitors')) {
+    if (!firebaseReady) { toast('Not connected to server', 'error'); return; }
+    showConfirm('Delete ALL Visitors?', 'This will permanently delete ALL visitor data!', async () => {
+      try {
+        await window._remove(window._ref(window._db, 'visitors'));
+        toast('✅ All visitors deleted!', 'success');
+        allVisitorsData = [];
+        document.getElementById('totalVisitors').textContent = '0';
+        loadVisitors();
+        updateStats();
+        await logActivity('🗑 Cleared ALL Visitors');
+      } catch (e) { toast('Error: ' + e.message, 'error'); }
+    });
+    return;
+  }
+
+  if (id === 'btnClearAllActivity' || target.closest('#btnClearAllActivity')) {
+    if (!firebaseReady) { toast('Not connected to server', 'error'); return; }
+    showConfirm('Delete ALL Activity?', 'This will permanently delete ALL admin activity logs!', async () => {
+      try {
+        await window._remove(window._ref(window._db, 'adminActivity'));
+        toast('✅ All activity deleted!', 'success');
+        loadActivity();
+      } catch (e) { toast('Error: ' + e.message, 'error'); }
+    });
+    return;
+  }
+
+  if (id === 'btnLogin' || target.closest('#btnLogin')) { doAdminLogin(); return; }
+  if (id === 'btnLogout' || target.closest('#btnLogout')) { adminLogout(); return; }
+  if (id === 'btnAddApp' || target.closest('#btnAddApp')) { addApp(); return; }
+  if (id === 'btnUpdateAdmin' || target.closest('#btnUpdateAdmin')) { updateAdmin(); return; }
+  if (id === 'btnSaveSettings' || target.closest('#btnSaveSettings')) { saveSettings(); return; }
+  if (id === 'btnSaveEdit' || target.closest('#btnSaveEdit')) { saveEditApp(); return; }
+
+  // ===== Ads Manager buttons =====
+  if (id === 'btnAddAd' || target.closest('#btnAddAd')) { addAd(); return; }
+  if (id === 'btnSaveEditAd' || target.closest('#btnSaveEditAd')) { saveEditAd(); return; }
+  if (id === 'btnSaveMaxPerSlot' || target.closest('#btnSaveMaxPerSlot')) { saveMaxPerSlot(); return; }
+  if (id === 'btnRefreshAds' || target.closest('#btnRefreshAds')) { loadAdsPanel(); updateStats(); toast('Refreshed', 'info'); return; }
+
+  if (id.startsWith('editAdBtn_')) { openEditAd(id.replace('editAdBtn_', '')); return; }
+  if (id.startsWith('delAdBtn_')) {
+    const key = id.replace('delAdBtn_', '');
+    showConfirm('Delete Ad?', 'This ad will stop showing on the website immediately.', () => deleteAd(key));
+    return;
+  }
+
+  if (id.startsWith('editAppBtn_')) { openEditApp(id.replace('editAppBtn_', '')); return; }
+  if (id.startsWith('delAppBtn_')) {
+    const key = id.replace('delAppBtn_', '');
+    showConfirm('Delete App?', 'This cannot be undone.', () => deleteApp(key));
+    return;
+  }
+  if (id.startsWith('delUserBtn_')) {
+    const key = id.replace('delUserBtn_', '');
+    showConfirm('Delete User?', 'This cannot be undone.', () => deleteUser(key));
+    return;
+  }
+  if (id.startsWith('delReportBtn_')) {
+    const key = id.replace('delReportBtn_', '');
+    showConfirm('Delete Report?', 'This cannot be undone.', () => deleteReport(key));
+    return;
+  }
+});
+
+// Ad enable/disable toggle (change event for switches)
+document.addEventListener('change', function (e) {
+  const t = e.target;
+  if (t && t.matches('.ad-toggle')) {
+    toggleAdEnabled(t.getAttribute('data-ad-key'), t.checked);
+  }
+});
+
+// ============ PANELS ============
+function showPanel(id) {
+  document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+  const panel = document.getElementById(id);
+  if (panel) panel.classList.add('active');
+  const tab = document.querySelector(`.admin-tab[data-panel="${id}"]`);
+  if (tab) tab.classList.add('active');
+
+  if (id === 'dashboard') { loadVisitors(); loadActivity(); updateStats(); loadAdLeaders(); }
+  if (id === 'appsList') loadApps();
+  if (id === 'usersList') loadUsers();
+  if (id === 'reportsPanel') loadReports();
+  if (id === 'adsPanel') loadAdsPanel();
+  if (id === 'settings') loadSettingsDisplay();
+}
+
+// ============ VISITORS ============
+async function loadVisitors() {
+  const c = document.getElementById('visitorListContainer');
+  if (!c) return;
+  c.innerHTML = '<div class="spinner"></div>';
+  try {
+    const snap = await window._get(window._ref(window._db, 'visitors'));
+    allVisitorsData = [];
+    if (snap.exists()) {
+      snap.forEach(ch => {
+        const d = ch.val();
+        d.key = ch.key;
+        allVisitorsData.push(d);
+      });
+    }
+    allVisitorsData.sort((a, b) => (b.lastVisit || 0) - (a.lastVisit || 0));
+    const recent = allVisitorsData.slice(0, 25);
+    let h = '';
+    if (!recent.length) {
+      h = '<div style="color:var(--text-dim);padding:20px;text-align:center;">No visitors yet</div>';
+    } else {
+      recent.forEach(v => {
+        const lv = v.lastVisit ? new Date(v.lastVisit).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+        const dn = v.deviceName || 'Unknown';
+        const hist = v.visitHistory;
+        const hc = hist ? (Array.isArray(hist) ? hist.length : Object.keys(hist).length) : 0;
+        h += `<div class="visitor-item" data-visitor-key="${esc(v.key)}">
+          <div class="visitor-info">
+            <span class="visitor-name">${esc(v.userName || dn)}</span>
+            <span class="badge ${v.userName ? 'user' : 'guest'}">${v.userName ? 'user' : 'guest'}</span>
+            <span class="visitor-detail">• ${esc(dn)}</span>
+            <span class="visitor-detail">• ${esc(v.ram || 'N/A')}</span>
+            <span class="visitor-detail">• ${hc} visits</span>
+          </div>
+          <div class="visitor-time">${lv}</div>
+        </div>`;
+      });
+    }
+    c.innerHTML = h;
+    document.getElementById('totalVisitors').textContent = allVisitorsData.length;
+  } catch (e) {
+    c.innerHTML = '<div style="color:red;padding:10px;">Error loading visitors</div>';
+  }
+}
+
+async function showVisitorDetail(vk) {
+  const overlay = document.getElementById('visitorDetailOverlay');
+  const content = document.getElementById('visitorDetailContent');
+  if (!overlay || !content) return;
+
+  overlay.classList.remove('hidden');
+  content.innerHTML = '<div class="spinner"></div>';
+  currentVisitorKey = vk;
+
+  let v = null;
+  try {
+    const snap = await window._get(window._ref(window._db, `visitors/${vk}`));
+    if (snap.exists()) { v = snap.val(); v.key = vk; }
+  } catch (e) {
+    content.innerHTML = '<div style="color:red;padding:40px;text-align:center;">❌ Error loading visitor data</div>';
+    return;
+  }
+
+  if (!v) {
+    content.innerHTML = '<div style="color:var(--text-dim);padding:40px;text-align:center;">❌ Visitor not found</div>';
+    return;
+  }
+
+  const isU = !!v.userName;
+  const dn = v.deviceName || 'Unknown Device';
+  const fv = v.firstVisit ? new Date(v.firstVisit).toLocaleString() : 'N/A';
+  const lv = v.lastVisit ? new Date(v.lastVisit).toLocaleString() : 'N/A';
+
+  let h = `<div style="text-align:center;margin-bottom:20px;">
+    <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--orange),var(--orange-light));display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#000;margin:0 auto 10px;">${isU ? (v.userName || 'U')[0].toUpperCase() : '📱'}</div>
+    <div style="font-size:18px;font-weight:700;">${esc(isU ? v.userName : dn)}</div>
+    <div style="font-size:12px;color:var(--text-dim);">${isU ? 'Registered User' : 'Guest Device'} • ${v.visitCount || 0} total visits</div>
+  </div>`;
+
+  if (isU) {
+    h += `
+    <div class="detail-row"><span class="detail-label">👤 Name</span><span class="detail-value">${esc(v.userName)}</span></div>
+    <div class="detail-row"><span class="detail-label">📧 Email</span><span class="detail-value">${esc(v.userEmail || 'N/A')}</span></div>
+    <div class="detail-row"><span class="detail-label">📱 Phone</span><span class="detail-value">${esc(v.userPhone || 'N/A')}</span></div>
+    <div class="detail-row"><span class="detail-label">⚧ Gender</span><span class="detail-value">${esc(v.userGender || 'N/A')}</span></div>`;
+  }
+
+  h += `
+  <div class="detail-row"><span class="detail-label">📱 Device</span><span class="detail-value">${esc(dn)}</span></div>
+  <div class="detail-row"><span class="detail-label">🧠 RAM</span><span class="detail-value">${esc(v.ram || 'N/A')}</span></div>
+  <div class="detail-row"><span class="detail-label">⚙️ CPU</span><span class="detail-value">${esc(v.cpuCores || 'N/A')} cores</span></div>
+  <div class="detail-row"><span class="detail-label">🖥 Platform</span><span class="detail-value">${esc(v.platform || 'N/A')}</span></div>
+  <div class="detail-row"><span class="detail-label">📐 Screen</span><span class="detail-value">${esc(v.screenResolution || 'N/A')}</span></div>
+  <div class="detail-row"><span class="detail-label">🌐 IP</span><span class="detail-value">${esc(v.ip || 'N/A')}</span></div>
+  <div class="detail-row"><span class="detail-label">🔋 Battery</span><span class="detail-value">${esc(v.battery || 'N/A')} ${esc(v.batteryStatus || '')}</span></div>
+  <div class="detail-row"><span class="detail-label">🌐 Browser</span><span class="detail-value">${esc(v.browser || 'N/A')}</span></div>
+  <div class="detail-row"><span class="detail-label">🗣 Language</span><span class="detail-value">${esc(v.language || 'N/A')}</span></div>
+  <div class="detail-row"><span class="detail-label">🕐 First Visit</span><span class="detail-value">${fv}</span></div>
+  <div class="detail-row"><span class="detail-label">🕑 Last Visit</span><span class="detail-value">${lv}</span></div>
+  <div class="detail-row"><span class="detail-label">🔢 Visit Count</span><span class="detail-value">${v.visitCount || 1} times</span></div>
+  <div class="detail-row"><span class="detail-label">🔑 Device Token</span><span class="detail-value" style="font-size:10px;">${esc(v.deviceToken || v.key || 'N/A')}</span></div>`;
+
+  // Visit History
+  let hist = [];
+  if (v.visitHistory) {
+    hist = Array.isArray(v.visitHistory) ? v.visitHistory.filter(Boolean) : Object.values(v.visitHistory).filter(Boolean);
+    hist.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  }
+
+  h += `<div style="margin-top:24px;border-top:1px solid var(--border);padding-top:16px;">
+    <div style="font-weight:700;font-size:15px;color:var(--orange);margin-bottom:12px;">📜 Visit History (${hist.length} entries)</div>`;
+
+  if (!hist.length) {
+    h += '<div style="color:var(--text-dim);text-align:center;padding:20px;">No history recorded yet</div>';
+  } else {
+    h += '<div class="history-timeline">';
+    hist.forEach((vh, i) => {
+      const vt = new Date(vh.timestamp).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      h += `<div class="history-item">
+        <div class="history-time">#${i + 1} • ${vt}</div>
+        <div class="history-details">
+          <span class="history-badge">🌐 ${esc(vh.ip || 'N/A')}</span>
+          <span class="history-badge">🌐 ${esc(vh.browser || 'N/A')}</span>
+          <span class="history-badge">📐 ${esc(vh.screenResolution || 'N/A')}</span>
+          <span class="history-badge">🧠 ${esc(vh.ram || 'N/A')}</span>
+          <span class="history-badge">🔋 ${esc(vh.batteryLevel || 'N/A')}</span>
+        </div>
+      </div>`;
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+  content.innerHTML = h;
+}
+
+// ============ ACTIVITY ============
+async function loadActivity() {
+  const c = document.getElementById('activityLogContainer');
+  if (!c) return;
+  c.innerHTML = '<div class="spinner"></div>';
+  try {
+    const snap = await window._get(window._ref(window._db, 'adminActivity'));
+    if (!snap.exists()) {
+      c.innerHTML = '<div style="color:var(--text-dim);padding:10px;text-align:center;">No activity yet</div>';
+      return;
+    }
+    let a = [];
+    snap.forEach(ch => { a.push(ch.val()); });
+    a.sort((x, y) => (y.timestamp || 0) - (x.timestamp || 0));
+    let h = '';
+    a.slice(0, 10).forEach(x => {
+      const t = new Date(x.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      h += `<div class="activity-item">
+        <div class="activity-info">
+          <span class="visitor-name">${esc(x.action)}</span>
+          ${x.detail ? `<span class="visitor-detail">• ${esc(x.detail)}</span>` : ''}
+        </div>
+        <div class="visitor-time">${t}</div>
+      </div>`;
+    });
+    c.innerHTML = h || '<div style="color:var(--text-dim);padding:10px;text-align:center;">No activity yet</div>';
+  } catch (e) {
+    c.innerHTML = '<div style="color:red;padding:10px;">Error loading activity</div>';
+  }
+}
+
+// ============ AD LEADERBOARD (dashboard) ============
+async function loadAdLeaders() {
+  const c = document.getElementById('adLeadersContainer');
+  if (!c) return;
+  try {
+    const [adsSnap, statsSnap] = await Promise.all([
+      window._get(window._ref(window._db, 'ads')),
+      window._get(window._ref(window._db, 'adStats'))
+    ]);
+    const names = {};
+    if (adsSnap.exists()) adsSnap.forEach(ch => { names[ch.key] = ch.val().name || 'Unnamed ad'; });
+    const stats = statsSnap.exists() ? statsSnap.val() : {};
+    const perAd = stats.perAd || {};
+    const rows = Object.keys(perAd)
+      .map(k => ({ name: names[k] || (k === 'default_social_bar' ? 'Social Bar (legacy)' : 'Deleted ad'), count: perAd[k] || 0 }))
+      .sort((a, b) => b.count - a.count);
+
+    if (!rows.length) {
+      c.innerHTML = '<div style="color:var(--text-dim);padding:14px;text-align:center;">No impressions recorded yet — ads দেখানো শুরু হলে এখানে per-ad impressions দেখা যাবে।</div>';
+      return;
+    }
+    c.innerHTML = rows.map(r => `<div class="activity-item" style="cursor:default;">
+      <div class="activity-info"><span class="visitor-name">${esc(r.name)}</span></div>
+      <div class="impressions-badge">👁 <b>${formatNum(r.count)}</b>&nbsp;views</div>
+    </div>`).join('');
+  } catch (e) {
+    c.innerHTML = '<div style="color:red;padding:10px;">Error loading ad stats</div>';
+  }
+}
+
+// ============ AUTH ============
+async function doAdminLogin() {
+  const u = document.getElementById('adminUser').value.trim();
+  const p = document.getElementById('adminPass').value;
+  if (!u || !p) { toast('Fill all fields', 'error'); return; }
+  if (!firebaseReady) { toast('Connecting to server...', 'info'); return; }
+  try {
+    const snap = await window._get(window._ref(window._db, 'admins'));
+    if (snap.exists()) {
+      let found = false, fk = null;
+      snap.forEach(c => {
+        const a = c.val();
+        if ((a.username === u || a.email === u) && a.password === p) { found = true; fk = c.key; }
+      });
+      if (found) {
+        currentAdminKey = fk;
+        sessionStorage.setItem('admin_logged_in', 'true');
+        sessionStorage.setItem('admin_key', fk);
+        document.getElementById('loginPage').style.display = 'none';
+        document.getElementById('adminDashboard').style.display = 'block';
+        toast('Welcome Admin! 🎉', 'success');
+        loadAll();
+        await logActivity('🔐 Admin Login');
+      } else { toast('Invalid credentials!', 'error'); }
+    } else { toast('No admin accounts found!', 'error'); }
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+function adminLogout() {
+  sessionStorage.clear();
+  currentAdminKey = null;
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('adminDashboard').style.display = 'none';
+  toast('Logged out successfully', 'success');
+}
+
+function loadAll() {
+  loadApps(); loadUsers(); loadReports(); updateStats(); loadVisitors(); loadActivity(); loadAdLeaders();
+  cleanupLegacyApkLink();
+}
+
+// পুরনো APK download system remove — পুরোনো data থেকে গেলে Firebase থেকেও পরিষ্কার করে দিই
+async function cleanupLegacyApkLink() {
+  try {
+    const snap = await window._get(window._ref(window._db, 'settings/apkDownloadLink'));
+    if (snap.exists()) {
+      await window._remove(window._ref(window._db, 'settings/apkDownloadLink'));
+      await logActivity('🗑 Removed legacy APK link', 'PWA enabled — APK system retired');
+    }
+  } catch (e) {}
+}
+
+async function updateStats() {
+  if (!firebaseReady) return;
+  try {
+    const [u, a, r, v, ad] = await Promise.all([
+      window._get(window._ref(window._db, 'users')),
+      window._get(window._ref(window._db, 'apps')),
+      window._get(window._ref(window._db, 'reports')),
+      window._get(window._ref(window._db, 'visitors')),
+      window._get(window._ref(window._db, 'adStats'))
+    ]);
+    document.getElementById('totalUsers').textContent = u.exists() ? u.size : 0;
+    document.getElementById('totalApps').textContent = a.exists() ? a.size : 0;
+    document.getElementById('totalReports').textContent = r.exists() ? r.size : 0;
+    document.getElementById('totalVisitors').textContent = v.exists() ? v.size : 0;
+
+    let downloads = 0, reviews = 0;
+    if (a.exists()) {
+      a.forEach(c => {
+        const app = c.val();
+        downloads += Number(app.downloads) || 0;
+        if (app.reviews) reviews += Object.keys(app.reviews).length;
+      });
+    }
+    document.getElementById('totalDownloads').textContent = formatNum(downloads);
+    document.getElementById('totalReviews').textContent = formatNum(reviews);
+
+    const st = ad.exists() ? ad.val() : {};
+    const total = Number(st.total) || 0;
+    const today = st.daily && st.daily[getLocalDayKey()] ? Number(st.daily[getLocalDayKey()]) : 0;
+    document.getElementById('totalImpressions').textContent = formatNum(total);
+    document.getElementById('todayImpressions').textContent = formatNum(today);
+  } catch (e) {}
+}
+
+// ============ APPS ============
+async function addApp() {
+  const n = document.getElementById('aName').value.trim();
+  const c = document.getElementById('aCategory').value;
+  const ic = document.getElementById('aIcon').value.trim() || '📱';
+  const img = document.getElementById('aImageUrl').value.trim();
+  const lk = document.getElementById('aLink').value.trim();
+  const d = document.getElementById('aDesc').value.trim();
+  const s1 = document.getElementById('aScreen1').value.trim();
+  const s2 = document.getElementById('aScreen2').value.trim();
+  const s3 = document.getElementById('aScreen3').value.trim();
+  const s4 = document.getElementById('aScreen4').value.trim();
+  const s5 = document.getElementById('aScreen5').value.trim();
+  if (!n || !d) { toast('Name and Description are required', 'error'); return; }
+  const appData = { name: n, icon: ic, imageUrl: img || null, category: c, description: d, link: lk || null, downloads: 0 };
+  if (s1) appData.screenshot1 = s1;
+  if (s2) appData.screenshot2 = s2;
+  if (s3) appData.screenshot3 = s3;
+  if (s4) appData.screenshot4 = s4;
+  if (s5) appData.screenshot5 = s5;
+  try {
+    await window._set(window._push(window._ref(window._db, 'apps')), appData);
+    toast('✅ App added successfully!', 'success');
+    await logActivity('➕ Added App', n);
+    ['aName','aImageUrl','aDesc','aLink','aScreen1','aScreen2','aScreen3','aScreen4','aScreen5'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('aIcon').value = '📱';
+    loadApps(); updateStats();
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+function loadApps() {
+  if (!firebaseReady) { setTimeout(loadApps, 600); return; }
+  const l = document.getElementById('adminAppsList');
+  if (!l) return;
+  l.innerHTML = '<div class="spinner"></div>';
+  window._get(window._ref(window._db, 'apps')).then(s => {
+    if (!s.exists()) { l.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center;">No apps added yet</div>'; return; }
+    let h = '';
+    s.forEach(c => {
+      const a = c.val();
+      let rating = 0;
+      if (a.reviews) {
+        const vals = Object.values(a.reviews).map(r => r.rating || 0).filter(r => r > 0);
+        if (vals.length > 0) rating = vals.reduce((t, r) => t + r, 0) / vals.length;
+      }
+      h += `<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+        <div>${a.imageUrl ? `<img src="${esc(a.imageUrl)}" style="width:40px;height:40px;border-radius:10px;object-fit:cover;" onerror="this.style.display='none'">` : ''}<span style="font-size:32px;">${esc(a.icon || '📱')}</span></div>
+        <div style="flex:1;">
+          <div style="font-weight:600;">${esc(a.name)}</div>
+          <div style="font-size:11px;color:var(--text-dim);">${esc(a.category)} • ⭐${rating.toFixed(1)} • ${formatNum(a.downloads || 0)} DL</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-outline btn-sm" id="editAppBtn_${c.key}">✏️ Edit</button>
+          <button class="btn btn-danger btn-sm" id="delAppBtn_${c.key}">🗑 Delete</button>
+        </div>
+      </div>`;
+    });
+    l.innerHTML = h;
+  }).catch(e => { l.innerHTML = '<div style="color:red;padding:10px;">Error loading apps</div>'; });
+}
+
+async function deleteApp(k) {
+  try {
+    const snap = await window._get(window._ref(window._db, 'apps/' + k));
+    const appName = snap.val()?.name || 'Unknown';
+    await window._remove(window._ref(window._db, 'apps/' + k));
+    toast('✅ App deleted!', 'success');
+    await logActivity('🗑 Deleted App', appName);
+    loadApps(); updateStats();
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+function openEditApp(k) {
+  window._get(window._ref(window._db, 'apps/' + k)).then(s => {
+    const a = s.val();
+    if (!a) { toast('App not found', 'error'); return; }
+    document.getElementById('editAppContent').innerHTML = `
+      <input type="hidden" id="editAppKey" value="${esc(k)}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="input-group" style="margin-bottom:10px;"><label>Name</label><input id="editName" value="${esc(a.name)}" placeholder="App name"></div>
+        <div class="input-group" style="margin-bottom:10px;"><label>Category</label>
+          <select id="editCategory">
+            ${['Social', 'Games', 'Tools', 'Entertainment', 'Other'].map(c => `<option ${a.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="input-group" style="margin-bottom:10px;"><label>Icon</label><input id="editIcon" value="${esc(a.icon || '📱')}" placeholder="📱"></div>
+        <div class="input-group" style="margin-bottom:10px;"><label>Image URL</label><input id="editImageUrl" value="${esc(a.imageUrl || '')}" placeholder="https://..."></div>
+      </div>
+      <div class="input-group" style="margin-bottom:10px;"><label>Link</label><input id="editLink" value="${esc(a.link || '')}" placeholder="https://..."></div>
+      <div class="input-group" style="margin-bottom:10px;"><label>Description</label><textarea id="editDesc" rows="2" placeholder="App description...">${esc(a.description || '')}</textarea></div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📸 App Screenshots</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 1</label><input id="editScreen1" value="${esc(a.screenshot1 || '')}" placeholder="https://..."></div>
+        <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 2</label><input id="editScreen2" value="${esc(a.screenshot2 || '')}" placeholder="https://..."></div>
+        <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 3</label><input id="editScreen3" value="${esc(a.screenshot3 || '')}" placeholder="https://..."></div>
+        <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 4</label><input id="editScreen4" value="${esc(a.screenshot4 || '')}" placeholder="https://..."></div>
+        <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 5</label><input id="editScreen5" value="${esc(a.screenshot5 || '')}" placeholder="https://..."></div>
+      </div>
+      <button class="btn btn-primary btn-sm" style="width:100%;margin-top:6px;" id="btnSaveEdit">💾 Save Changes</button>`;
+    document.getElementById('editAppOverlay').classList.remove('hidden');
+  });
+}
+
+async function saveEditApp() {
+  const k = document.getElementById('editAppKey')?.value;
+  if (!k) return;
+  const n = document.getElementById('editName')?.value.trim();
+  const c = document.getElementById('editCategory')?.value;
+  const ic = document.getElementById('editIcon')?.value.trim() || '📱';
+  const img = document.getElementById('editImageUrl')?.value.trim();
+  const lk = document.getElementById('editLink')?.value.trim();
+  const d = document.getElementById('editDesc')?.value.trim();
+  const s1 = document.getElementById('editScreen1')?.value.trim();
+  const s2 = document.getElementById('editScreen2')?.value.trim();
+  const s3 = document.getElementById('editScreen3')?.value.trim();
+  const s4 = document.getElementById('editScreen4')?.value.trim();
+  const s5 = document.getElementById('editScreen5')?.value.trim();
+  if (!n || !d) { toast('Name and Description are required', 'error'); return; }
+  const updates = { name: n, category: c, icon: ic, imageUrl: img || null, link: lk || null, description: d,
+    screenshot1: s1 || null, screenshot2: s2 || null, screenshot3: s3 || null, screenshot4: s4 || null, screenshot5: s5 || null };
+  try {
+    await window._update(window._ref(window._db, 'apps/' + k), updates);
+    toast('✅ App updated!', 'success');
+    await logActivity('✏️ Edited App', n);
+    closeModal('editAppOverlay');
+    loadApps();
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ============ USERS ============
+function loadUsers() {
+  if (!firebaseReady) { setTimeout(loadUsers, 600); return; }
+  const l = document.getElementById('adminUsersList');
+  if (!l) return;
+  l.innerHTML = '<div class="spinner"></div>';
+  window._get(window._ref(window._db, 'users')).then(s => {
+    if (!s.exists()) { l.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center;">No users registered yet</div>'; return; }
+    let h = '';
+    s.forEach(c => {
+      const u = c.val();
+      h += `<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+        <div style="flex:1;">
+          <div style="font-weight:600;">${esc(u.name)}</div>
+          <div style="font-size:11px;color:var(--text-dim);">${esc(u.email || u.number)} • ${esc(u.gender || 'N/A')}</div>
+        </div>
+        <button class="btn btn-danger btn-sm" id="delUserBtn_${c.key}">🗑 Delete</button>
+      </div>`;
+    });
+    l.innerHTML = h;
+  }).catch(e => { l.innerHTML = '<div style="color:red;padding:10px;">Error loading users</div>'; });
+}
+
+async function deleteUser(k) {
+  try {
+    const snap = await window._get(window._ref(window._db, 'users/' + k));
+    const userName = snap.val()?.name || 'Unknown';
+    await window._remove(window._ref(window._db, 'users/' + k));
+    toast('✅ User deleted!', 'success');
+    await logActivity('🗑 Deleted User', userName);
+    loadUsers(); updateStats();
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ============ REPORTS ============
+function loadReports() {
+  if (!firebaseReady) { setTimeout(loadReports, 600); return; }
+  const l = document.getElementById('adminReportsList');
+  if (!l) return;
+  l.innerHTML = '<div class="spinner"></div>';
+  window._get(window._ref(window._db, 'reports')).then(s => {
+    if (!s.exists()) { l.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center;">No reports submitted yet</div>'; return; }
+    let h = '';
+    const rows = [];
+    s.forEach(c => rows.push({ key: c.key, ...c.val() }));
+    rows.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    const now = Date.now();
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    rows.forEach(r => {
+      const t = r.timestamp ? new Date(r.timestamp).toLocaleString() : 'N/A';
+      const isReview = r.type === 'auto_review' || r.source === 'review_section';
+      const isReportUs = r.type === 'report_us' || r.source === 'report_us';
+      const age = now - (r.timestamp || 0);
+      const locked = isReview && age < THIRTY_DAYS;
+      const daysLeft = Math.ceil((THIRTY_DAYS - age) / (24*60*60*1000));
+      const sourceBadge = isReview
+        ? '<span style="font-size:10px;background:var(--orange-dim);color:var(--orange);border:1px solid var(--border);padding:2px 7px;border-radius:99px;margin-left:6px;">Collected by review section</span>'
+        : isReportUs
+        ? '<span style="font-size:10px;background:rgba(255,100,100,0.12);color:#f87171;border:1px solid rgba(255,100,100,0.3);padding:2px 7px;border-radius:99px;margin-left:6px;">Collected by Report us</span>'
+        : '';
+      const deleteBtn = locked
+        ? `<span style="font-size:10px;color:var(--text-dim);background:var(--card2);padding:4px 8px;border-radius:6px;">🔒 ${daysLeft}d left</span>`
+        : `<button class="btn btn-danger btn-sm" id="delReportBtn_${r.key}">🗑</button>`;
+      h += `<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <span style="font-weight:600;display:flex;align-items:center;flex-wrap:wrap;">${esc(r.subject || 'No Subject')}${sourceBadge}</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span style="font-size:10px;color:var(--text-dim);">${t}</span>
+            ${deleteBtn}
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">From: ${esc(r.username || 'Anonymous')} | ${esc(r.email || '')}</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:6px;">${esc(r.message || '')}</div>
+      </div>`;
+    });
+    l.innerHTML = h;
+  }).catch(e => { l.innerHTML = '<div style="color:red;padding:10px;">Error loading reports</div>'; });
+}
+
+async function deleteReport(k) {
+  try {
+    await window._remove(window._ref(window._db, 'reports/' + k));
+    toast('✅ Report deleted!', 'success');
+    loadReports(); updateStats();
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ============================================================
+// ADS MANAGER — website এর সব ad এখান থেকে control হয়
+// ============================================================
+function slotPickerHtml(checkedSlots, prefix) {
+  return AD_SLOTS.map(s => `
+    <label class="slot-pick">
+      <input type="checkbox" class="slot-check" data-prefix="${prefix}" value="${s.id}" ${checkedSlots.includes(s.id) ? 'checked' : ''}>
+      <span><span class="slot-pick-name">${esc(s.name)}</span><br><span class="slot-pick-desc">${esc(s.desc)}</span></span>
+    </label>`).join('');
+}
+
+function getPickedSlots(prefix) {
+  return Array.from(document.querySelectorAll(`.slot-check[data-prefix="${prefix}"]:checked`)).map(x => x.value);
+}
+
+// প্রথমবার Ads Manager খুললে পুরনো social bar ad টা auto-seed করে দিই
+async function ensureAdsSeeded() {
+  try {
+    const flag = await window._get(window._ref(window._db, 'settings/adsInitialized'));
+    if (flag.exists() && flag.val() === true) return;
+    const newRef = window._push(window._ref(window._db, 'ads'));
+    await window._set(newRef, { ...DEFAULT_AD, createdAt: Date.now(), updatedAt: Date.now() });
+    await window._set(window._ref(window._db, 'settings/adsInitialized'), true);
+    const mps = await window._get(window._ref(window._db, 'settings/adsMaxPerSlot'));
+    if (!mps.exists()) await window._set(window._ref(window._db, 'settings/adsMaxPerSlot'), 2);
+    await logActivity('🎯 Ads system initialized', 'Default social bar ad seeded');
+  } catch (e) { console.error('Ads seed error:', e); }
+}
+
+async function loadAdsPanel() {
+  if (!firebaseReady) { setTimeout(loadAdsPanel, 600); return; }
+  document.getElementById('newAdSlots').innerHTML = slotPickerHtml(['floating'], 'new');
+  await ensureAdsSeeded();
+
+  try {
+    const [adsSnap, statsSnap, mpsSnap] = await Promise.all([
+      window._get(window._ref(window._db, 'ads')),
+      window._get(window._ref(window._db, 'adStats')),
+      window._get(window._ref(window._db, 'settings/adsMaxPerSlot'))
+    ]);
+
+    cachedAds = [];
+    if (adsSnap.exists()) {
+      adsSnap.forEach(ch => cachedAds.push({ key: ch.key, ...ch.val() }));
+    }
+    cachedAds.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    cachedAdStats = statsSnap.exists() ? statsSnap.val() : {};
+
+    // Overview numbers
+    const total = Number(cachedAdStats.total) || 0;
+    const today = cachedAdStats.daily && cachedAdStats.daily[getLocalDayKey()] ? Number(cachedAdStats.daily[getLocalDayKey()]) : 0;
+    document.getElementById('adsTotalImpressions').textContent = formatNum(total);
+    document.getElementById('adsTodayImpressions').textContent = formatNum(today);
+    document.getElementById('adsActiveCount').textContent = cachedAds.filter(a => a.enabled !== false).length;
+
+    // Per-slot impressions
+    const perSlot = cachedAdStats.perSlot || {};
+    document.getElementById('slotStatsGrid').innerHTML = AD_SLOTS.map(s =>
+      `<div class="slot-stat"><b>${formatNum(perSlot[s.id] || 0)}</b>${esc(s.name)}</div>`
+    ).join('');
+
+    // Max per slot selector
+    const mps = mpsSnap.exists() ? Number(mpsSnap.val()) : 2;
+    const sel = document.getElementById('maxPerSlotSelect');
+    if (sel) sel.value = String(Math.min(Math.max(mps || 2, 1), 3));
+
+    renderAdminAdsList();
+    updateStats();
+  } catch (e) {
+    document.getElementById('adminAdsList').innerHTML = '<div style="color:red;padding:10px;">Error loading ads</div>';
+  }
+}
+
+function renderAdminAdsList() {
+  const l = document.getElementById('adminAdsList');
+  if (!l) return;
+  if (!cachedAds.length) {
+    l.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:12px;">No ads configured — website এ এখন কোনো ad দেখাচ্ছে না। উপরের "Add New Ad" দিয়ে নতুন ad যোগ করুন।</div>';
+    return;
+  }
+  const perAd = (cachedAdStats && cachedAdStats.perAd) || {};
+  l.innerHTML = cachedAds.map(a => {
+    const placements = Array.isArray(a.placements) ? a.placements : (a.placements ? Object.values(a.placements) : []);
+    const enabled = a.enabled !== false;
+    return `<div class="ad-card-admin">
+      <div class="ad-card-head">
+        <div class="ad-name">
+          ${enabled ? '🟢' : '🔴'} ${esc(a.name || 'Unnamed Ad')}
+          <span class="ad-status ${enabled ? 'on' : 'off'}">${enabled ? 'ACTIVE' : 'OFF'}</span>
+        </div>
+        <label class="switch" title="On/Off">
+          <input type="checkbox" class="ad-toggle" data-ad-key="${esc(a.key)}" ${enabled ? 'checked' : ''}>
+          <span class="track"></span>
+        </label>
+      </div>
+      <div class="ad-meta">
+        👁 <b style="color:var(--orange);">${formatNum(perAd[a.key] || 0)}</b> impressions
+        ${a.updatedAt ? ` • last edited ${new Date(a.updatedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
+      </div>
+      <div class="slot-chips">${placements.map(p => `<span class="slot-chip">${esc(slotLabel(p))}</span>`).join('') || '<span class="slot-chip" style="background:#333;color:#aaa;">No placement — showing nowhere</span>'}</div>
+      <div class="ad-code-preview">${esc(a.code || '(empty code)')}</div>
+      <div class="ad-actions">
+        <button class="btn btn-outline btn-sm" id="editAdBtn_${esc(a.key)}">✏️ Edit</button>
+        <button class="btn btn-danger btn-sm" id="delAdBtn_${esc(a.key)}">🗑 Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function addAd() {
+  const name = document.getElementById('newAdName').value.trim();
+  const code = document.getElementById('newAdCode').value.trim();
+  const placements = getPickedSlots('new');
+  if (!name) { toast('Give the ad a name first', 'error'); return; }
+  if (!code) { toast('Paste the ad code first', 'error'); return; }
+  if (!placements.length) { toast('Select at least one placement', 'error'); return; }
+  try {
+    const newRef = window._push(window._ref(window._db, 'ads'));
+    await window._set(newRef, { name, code, placements, enabled: true, createdAt: Date.now(), updatedAt: Date.now() });
+    await window._set(window._ref(window._db, 'settings/adsInitialized'), true);
+    toast('✅ Ad added — website এ এখনই live!', 'success');
+    await logActivity('➕ Added Ad', name);
+    document.getElementById('newAdName').value = '';
+    document.getElementById('newAdCode').value = '';
+    loadAdsPanel();
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+function openEditAd(k) {
+  const ad = cachedAds.find(x => x.key === k);
+  if (!ad) { toast('Ad not found — refresh the tab', 'error'); return; }
+  const placements = Array.isArray(ad.placements) ? ad.placements : (ad.placements ? Object.values(ad.placements) : []);
+  document.getElementById('editAdContent').innerHTML = `
+    <input type="hidden" id="editAdKey" value="${esc(ad.key)}">
+    <div class="input-group"><label>Ad Name</label><input id="editAdName" value="${esc(ad.name || '')}" placeholder="Ad name"></div>
+    <div class="input-group">
+      <label>Ad Code</label>
+      <textarea id="editAdCode" rows="5">${esc(ad.code || '')}</textarea>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);font-weight:600;margin-bottom:8px;">📍 Placements:</div>
+    <div class="slot-pick-grid">${slotPickerHtml(placements, 'edit')}</div>
+    <label class="slot-pick" style="max-width:240px;margin-bottom:14px;">
+      <input type="checkbox" id="editAdEnabled" ${ad.enabled !== false ? 'checked' : ''}>
+      <span><span class="slot-pick-name">Ad Active</span><br><span class="slot-pick-desc">Off করলে website থেকে hide হয়ে যাবে</span></span>
+    </label>
+    <button class="btn btn-primary btn-sm" style="width:100%;" id="btnSaveEditAd">💾 Save Changes</button>`;
+  document.getElementById('editAdOverlay').classList.remove('hidden');
+}
+
+async function saveEditAd() {
+  const k = document.getElementById('editAdKey')?.value;
+  if (!k) return;
+  const name = document.getElementById('editAdName')?.value.trim();
+  const code = document.getElementById('editAdCode')?.value.trim();
+  const enabled = document.getElementById('editAdEnabled')?.checked;
+  const placements = getPickedSlots('edit');
+  if (!name) { toast('Name cannot be empty', 'error'); return; }
+  if (!code) { toast('Ad code cannot be empty', 'error'); return; }
+  if (!placements.length) { toast('Select at least one placement', 'error'); return; }
+  try {
+    await window._update(window._ref(window._db, 'ads/' + k), { name, code, placements, enabled: !!enabled, updatedAt: Date.now() });
+    toast('✅ Ad updated!', 'success');
+    await logActivity('✏️ Edited Ad', name);
+    closeModal('editAdOverlay');
+    loadAdsPanel();
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function toggleAdEnabled(k, enabled) {
+  try {
+    await window._update(window._ref(window._db, 'ads/' + k), { enabled: !!enabled, updatedAt: Date.now() });
+    const ad = cachedAds.find(x => x.key === k);
+    toast(enabled ? '🟢 Ad is now ACTIVE' : '🔴 Ad turned OFF', 'success');
+    await logActivity(enabled ? '🟢 Enabled Ad' : '🔴 Disabled Ad', ad ? ad.name : '');
+    loadAdsPanel();
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function deleteAd(k) {
+  try {
+    const ad = cachedAds.find(x => x.key === k);
+    await window._remove(window._ref(window._db, 'ads/' + k));
+    await window._set(window._ref(window._db, 'settings/adsInitialized'), true);
+    toast('✅ Ad deleted!', 'success');
+    await logActivity('🗑 Deleted Ad', ad ? ad.name : '');
+    loadAdsPanel();
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function saveMaxPerSlot() {
+  const v = Number(document.getElementById('maxPerSlotSelect')?.value) || 2;
+  try {
+    await window._set(window._ref(window._db, 'settings/adsMaxPerSlot'), Math.min(Math.max(v, 1), 3));
+    toast('✅ Placement rule saved!', 'success');
+    await logActivity('⚙️ Updated Ads Rule', `max ${v} ad(s) per slot`);
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ============ SETTINGS ============
+async function updateAdmin() {
+  const cp = document.getElementById('currentAdminPass').value.trim();
+  const nu = document.getElementById('newAdminUser').value.trim();
+  const np = document.getElementById('newAdminPass').value.trim();
+  if (!cp) { toast('Enter current password', 'error'); return; }
+  try {
+    const s = await window._get(window._ref(window._db, `admins/${currentAdminKey}`));
+    if (s.val()?.password === cp) {
+      const u = {};
+      if (nu) u.username = nu;
+      if (np) u.password = np;
+      if (Object.keys(u).length) {
+        await window._update(window._ref(window._db, `admins/${currentAdminKey}`), u);
+        toast('✅ Credentials updated!', 'success');
+        await logActivity('🔐 Updated Admin Credentials');
+        document.getElementById('currentAdminPass').value = '';
+        document.getElementById('newAdminUser').value = '';
+        document.getElementById('newAdminPass').value = '';
+      } else { toast('Nothing to update', 'info'); }
+    } else { toast('Wrong current password', 'error'); }
+  } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function saveSettings() {
+  const n = document.getElementById('websiteNameInput').value.trim() || 'SamWeb Store';
+  const logo = document.getElementById('logoUrlInput')?.value.trim();
+  localStorage.setItem('website_name', n);
+  try {
+    await window._set(window._ref(window._db, 'settings/websiteName'), n);
+    if (logo) {
+      await window._set(window._ref(window._db, 'settings/logoUrl'), logo);
+      const prev = document.getElementById('logoPreview');
+      const prevWrap = document.getElementById('logoPreviewWrap');
+      if (prev && logo) { prev.src = logo; prevWrap.style.display = 'block'; }
+    } else {
+      await window._remove(window._ref(window._db, 'settings/logoUrl'));
+      const prevWrap = document.getElementById('logoPreviewWrap');
+      if (prevWrap) prevWrap.style.display = 'none';
+    }
+  } catch(e) {}
+  toast('✅ Settings saved!', 'success');
+  logActivity('⚙️ Updated Website Settings', n);
+}
+
+async function loadSettingsDisplay() {
+  try {
+    const [logoSnap, nameSnap] = await Promise.all([
+      window._get(window._ref(window._db, 'settings/logoUrl')),
+      window._get(window._ref(window._db, 'settings/websiteName'))
+    ]);
+    const logoInput = document.getElementById('logoUrlInput');
+    const prevWrap = document.getElementById('logoPreviewWrap');
+    const prevImg = document.getElementById('logoPreview');
+    if (logoSnap.exists() && logoSnap.val()) {
+      if (logoInput) logoInput.value = logoSnap.val();
+      if (prevImg) prevImg.src = logoSnap.val();
+      if (prevWrap) prevWrap.style.display = 'block';
+    }
+    if (nameSnap.exists() && nameSnap.val()) {
+      const nameInput = document.getElementById('websiteNameInput');
+      if (nameInput) nameInput.value = nameSnap.val();
+    }
+  } catch (e) {}
+}
+
+// ============ INIT ============
+window.addEventListener('firebaseReady', async () => {
+  firebaseReady = true;
+  console.log('✅ Firebase connected');
+  const sk = sessionStorage.getItem('admin_key');
+  if (sessionStorage.getItem('admin_logged_in') === 'true' && sk) {
+    currentAdminKey = sk;
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('adminDashboard').style.display = 'block';
+    loadAll();
+  } else {
+    document.getElementById('loginPage').style.display = 'flex';
+  }
+});
+</script>
+</body>
+</html>

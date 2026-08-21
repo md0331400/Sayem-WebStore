@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, push, set, get, remove, update, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, push, set, get, remove, update, onValue, runTransaction, increment } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDo4VtvFjkHK_qPKw_8OvjWB3DF93m0_vE",
@@ -27,7 +27,8 @@ const DEFAULT_WEBSITE_NAME = "SamWeb Store";
 const DEFAULT_LOGO = "icons/icon-192.png";
 const CACHE_KEYS = {
   apps: "samweb_cached_apps_v3",
-  settings: "samweb_cached_settings_v2",
+  settings: "samweb_cached_settings_v3",
+  ads: "samweb_cached_ads_v1",
   installDismissed: "samweb_install_banner_dismissed"
 };
 
@@ -37,7 +38,6 @@ let allApps = [];
 let firebaseReady = false;
 let currentAppId = null;
 let selectedRatingValue = 0;
-let apkDownloadLink = null;
 let deferredInstallPrompt = null;
 let appsSubscribed = false;
 let activeCategory = "All";
@@ -182,13 +182,14 @@ function hydrateFromCache() {
   const settings = getCachedSettings();
   applyWebsiteName(getSavedWebsiteName() || settings.websiteName || DEFAULT_WEBSITE_NAME);
   applyLogo(settings.logoUrl || DEFAULT_LOGO);
-  if (settings.apkDownloadLink) apkDownloadLink = settings.apkDownloadLink;
 
   const cachedApps = getCachedApps();
   if (cachedApps.length) {
     allApps = cachedApps;
     renderApps(applyAppFilters());
   }
+
+  hydrateAdsFromCache();
 }
 
 function updateConnectionState() {
@@ -298,6 +299,7 @@ function showPage(id) {
   closeMenu();
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (id === "homePage") loadApps();
+  renderAds();
   if (id === "searchPage") {
     setTimeout(() => {
       const input = $("searchPageInput");
@@ -509,14 +511,6 @@ function buildSideMenu() {
     installBtn.innerHTML = `<span class="nav-icon">📲</span>${installLabel}`;
     installBtn.onclick = () => triggerInstallPrompt();
     nav.appendChild(installBtn);
-  }
-
-  if (apkDownloadLink) {
-    const apkBtn = document.createElement("button");
-    apkBtn.className = "nav-item-apk";
-    apkBtn.innerHTML = '<span class="nav-icon">📦</span>Download Android APK';
-    apkBtn.onclick = openApkDownload;
-    nav.appendChild(apkBtn);
   }
 
   if (currentUser) {
@@ -840,7 +834,6 @@ async function loadWebsiteSettings() {
   const cached = getCachedSettings();
   applyWebsiteName(getSavedWebsiteName() || cached.websiteName || DEFAULT_WEBSITE_NAME);
   applyLogo(cached.logoUrl || DEFAULT_LOGO);
-  apkDownloadLink = cached.apkDownloadLink || apkDownloadLink;
 
   if (!firebaseReady) {
     buildSideMenu();
@@ -848,25 +841,251 @@ async function loadWebsiteSettings() {
   }
 
   try {
-    const [apkSnap, logoSnap] = await Promise.all([
-      window._get(window._ref(window._db, "settings/apkDownloadLink")),
+    const [nameSnap, logoSnap] = await Promise.all([
+      window._get(window._ref(window._db, "settings/websiteName")),
       window._get(window._ref(window._db, "settings/logoUrl"))
     ]);
-
-    apkDownloadLink = apkSnap.exists() && apkSnap.val() ? apkSnap.val() : null;
+    const remoteName = nameSnap.exists() && nameSnap.val() ? String(nameSnap.val()) : null;
     const logoUrl = logoSnap.exists() && logoSnap.val() ? logoSnap.val() : null;
+    const finalName = getSavedWebsiteName() || remoteName || DEFAULT_WEBSITE_NAME;
 
+    applyWebsiteName(finalName);
     applyLogo(logoUrl || DEFAULT_LOGO);
     cacheSettings({
-      websiteName: getSavedWebsiteName() || DEFAULT_WEBSITE_NAME,
-      logoUrl: logoUrl || DEFAULT_LOGO,
-      apkDownloadLink: apkDownloadLink || null
+      websiteName: finalName,
+      logoUrl: logoUrl || DEFAULT_LOGO
     });
   } catch (e) {
     console.warn("Website settings load error:", e);
   }
 
   buildSideMenu();
+}
+
+// ============================================================
+// ADS ENGINE — ads are fully managed from Admin Panel → Ads Manager.
+// Firebase layout:
+//   ads/<pushKey>        → { name, code, placements[], enabled, createdAt, updatedAt }
+//   settings/adsInitialized → true once the admin panel seed/setup ran
+//   settings/adsMaxPerSlot  → max ads rendered per placement slot
+//   adStats/total           → total impressions (all ads, all time)
+//   adStats/perAd/<adKey>   → impressions per ad
+//   adStats/perSlot/<slot>  → impressions per placement slot
+//   adStats/daily/<YYYYMMDD>→ daily impressions (local day)
+// ============================================================
+const AD_PLACEMENTS = ["home_top", "home_mid", "home_bottom", "games_top", "apps_top", "detail_bottom", "floating"];
+
+// Fallback ad shown until the admin panel initialises the ads node
+// (keeps the previously hard-coded social bar running).
+const DEFAULT_ADS = [
+  {
+    key: "default_social_bar",
+    name: "Social Bar",
+    code: '<script src="https://pl30953956.effectivecpmnetwork.com/6b/e0/7d/6be07d26bb1585e42fa3eafbebc5a187.js"></script>',
+    placements: ["floating"],
+    enabled: true,
+    builtin: true
+  }
+];
+
+let adsState = {
+  initialized: false,
+  maxPerSlot: 2,
+  ads: []
+};
+let adsSubscribed = false;
+let adsConfigSettled = false; // floating ads wait for this (prevents brief fallback flash)
+const floatingInjected = new Set();
+const adImpressionsLogged = new Set();
+
+function normalizeAdPlacements(placements) {
+  if (!placements) return [];
+  const list = Array.isArray(placements) ? placements : Object.values(placements);
+  return list.filter((slot) => AD_PLACEMENTS.includes(slot));
+}
+
+function getActiveAds() {
+  if (!adsState.initialized && !adsState.ads.length) return DEFAULT_ADS;
+  return adsState.ads.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+}
+
+function getSlotAds(slotId) {
+  return getActiveAds()
+    .filter((ad) => ad && ad.enabled !== false && normalizeAdPlacements(ad.placements).includes(slotId))
+    .slice(0, Math.max(1, adsState.maxPerSlot || 1));
+}
+
+function getLocalDayKey() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+}
+
+function trackAdImpression(adKey, slotId) {
+  if (!adKey) return;
+  const stamp = `${adKey}@${slotId}`;
+  if (adImpressionsLogged.has(stamp)) return;
+  adImpressionsLogged.add(stamp);
+  if (!firebaseReady) return;
+  window
+    ._update(window._ref(window._db, "adStats"), {
+      total: increment(1),
+      [`perAd/${adKey}`]: increment(1),
+      [`perSlot/${slotId}`]: increment(1),
+      [`daily/${getLocalDayKey()}`]: increment(1)
+    })
+    .catch((e) => console.warn("Ad impression log failed:", e));
+}
+
+// Injects raw ad-network code. Scripts are recreated so they execute,
+// and external scripts load in the order they appear in the snippet
+// (required for atOptions-style banners).
+function injectAdCode(container, code) {
+  if (!container || !code) return;
+  try {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = String(code);
+    const queue = Array.from(tpl.content.childNodes);
+    const runNext = () => {
+      const node = queue.shift();
+      if (!node) return;
+      if (node.nodeName === "SCRIPT") {
+        const script = document.createElement("script");
+        Array.from(node.attributes || []).forEach((attr) => script.setAttribute(attr.name, attr.value));
+        if (node.src) {
+          script.async = false;
+          script.addEventListener("load", runNext);
+          script.addEventListener("error", runNext);
+          container.appendChild(script);
+        } else {
+          script.textContent = node.textContent || "";
+          container.appendChild(script);
+          runNext();
+        }
+      } else {
+        container.appendChild(node);
+        runNext();
+      }
+    };
+    runNext();
+  } catch (e) {
+    console.warn("Ad code injection failed:", e);
+  }
+}
+
+function renderFloatingAds(slotEl) {
+  // Floating scripts (social bar / popunder) cannot be un-injected once executed,
+  // so wait until the remote ads config answered (or a short timeout on slow/offline
+  // networks) before rendering them.
+  if (!adsConfigSettled) return;
+  getSlotAds("floating").forEach((ad) => {
+    if (floatingInjected.has(ad.key)) return;
+    floatingInjected.add(ad.key);
+    injectAdCode(slotEl, ad.code || "");
+    trackAdImpression(ad.key, "floating");
+  });
+}
+
+function renderAds() {
+  document.querySelectorAll("[data-ad-slot]").forEach((slotEl) => {
+    const slotId = slotEl.getAttribute("data-ad-slot");
+    if (slotId === "floating") {
+      renderFloatingAds(slotEl);
+      return;
+    }
+
+    // Never render/count ads inside a page the user can't see
+    const ownerPage = slotEl.closest(".page");
+    if (ownerPage && !ownerPage.classList.contains("active")) return;
+
+    const ads = getSlotAds(slotId);
+    slotEl.innerHTML = "";
+    if (!ads.length) {
+      slotEl.classList.add("hidden");
+      return;
+    }
+
+    slotEl.classList.remove("hidden");
+    ads.forEach((ad) => {
+      const unit = document.createElement("div");
+      unit.className = "ad-unit";
+      const tag = document.createElement("div");
+      tag.className = "ad-tag";
+      tag.textContent = "Advertisement";
+      const body = document.createElement("div");
+      body.className = "ad-body";
+      unit.appendChild(tag);
+      unit.appendChild(body);
+      slotEl.appendChild(unit);
+      injectAdCode(body, ad.code || "");
+      trackAdImpression(ad.key, slotId);
+    });
+  });
+}
+
+function persistAdsCache() {
+  setStoredJson(CACHE_KEYS.ads, {
+    initialized: adsState.initialized,
+    maxPerSlot: adsState.maxPerSlot,
+    ads: adsState.ads
+  });
+}
+
+function hydrateAdsFromCache() {
+  const cached = getStoredJson(CACHE_KEYS.ads, null);
+  if (cached && typeof cached === "object") {
+    adsState.initialized = cached.initialized === true;
+    if (Number(cached.maxPerSlot) > 0) adsState.maxPerSlot = Math.min(Number(cached.maxPerSlot), 5);
+    if (Array.isArray(cached.ads)) adsState.ads = cached.ads;
+  }
+  renderAds();
+}
+
+function subscribeAds() {
+  if (adsSubscribed || !firebaseReady) return;
+  adsSubscribed = true;
+
+  window._onValue(
+    window._ref(window._db, "settings/adsInitialized"),
+    (snap) => {
+      adsState.initialized = snap.exists() && snap.val() === true;
+      adsConfigSettled = true;
+      persistAdsCache();
+      renderAds();
+    },
+    (e) => {
+      adsConfigSettled = true;
+      renderAds();
+      console.warn("adsInitialized subscription error:", e);
+    }
+  );
+
+  window._onValue(
+    window._ref(window._db, "settings/adsMaxPerSlot"),
+    (snap) => {
+      const v = Number(snap.exists() ? snap.val() : 0);
+      adsState.maxPerSlot = Number.isFinite(v) && v > 0 ? Math.min(Math.round(v), 5) : 2;
+      persistAdsCache();
+      renderAds();
+    },
+    (e) => console.warn("adsMaxPerSlot subscription error:", e)
+  );
+
+  window._onValue(
+    window._ref(window._db, "ads"),
+    (snap) => {
+      const ads = [];
+      if (snap.exists()) {
+        snap.forEach((child) => {
+          ads.push({ key: child.key, ...child.val() });
+        });
+      }
+      adsState.ads = ads;
+      persistAdsCache();
+      renderAds();
+    },
+    (e) => console.warn("Ads subscription error:", e)
+  );
 }
 
 function getAverageRating(app) {
@@ -1337,6 +1556,8 @@ function openAppDetail(key) {
           <div class="reviews-list">${reviewsHtml}</div>
         </div>
       </div>
+
+      <div class="ad-slot hidden" data-ad-slot="detail_bottom"></div>
     </div>
   `;
 
@@ -1499,16 +1720,6 @@ function closeAboutM(e) {
 }
 window.closeAboutM = closeAboutM;
 
-function openApkDownload() {
-  closeMenu();
-  if (apkDownloadLink && apkDownloadLink.startsWith("http")) {
-    window.open(apkDownloadLink, "_blank");
-  } else {
-    toast("APK link not set by admin yet.", "error");
-  }
-}
-window.openApkDownload = openApkDownload;
-
 // ============ THEME (dark / light) ============
 function getSavedTheme() {
   try {
@@ -1606,6 +1817,14 @@ function initShell() {
   registerServiceWorker();
   setupGlobalEvents();
   readSearchParam();
+
+  // Offline / slow-network fallback: release floating ads after a short wait
+  setTimeout(() => {
+    if (!adsConfigSettled) {
+      adsConfigSettled = true;
+      renderAds();
+    }
+  }, 1800);
 }
 
 function onFirebaseReady() {
@@ -1613,6 +1832,7 @@ function onFirebaseReady() {
   console.log("Firebase connected ✅");
   loadApps();
   loadWebsiteSettings();
+  subscribeAds();
   recordVisit();
 }
 

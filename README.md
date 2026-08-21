@@ -17,8 +17,9 @@ Apps & Games ডাউনলোড প্ল্যাটফর্ম — Firebas
 
 ```
 ├── index.html        → Main website (নতুন পূর্ণাঙ্গ landing page)
+├── admin/index.html  → Admin Panel (⚙️ /admin URL-এ) — ads, apps, users, visitors, stats
 ├── style.css         → পুরো design/theme
-├── app.js            → সব logic (Firebase, auth, apps, PWA, tracking)
+├── app.js            → সব logic (Firebase, auth, apps, ads engine, PWA, tracking)
 ├── manifest.json     → PWA manifest
 ├── service-worker.js → Offline cache
 ├── robots.txt        → Search engine
@@ -68,11 +69,37 @@ firebase deploy
 2. পুরো ফোল্ডারটা drag & drop করো
 3. Live link সাথে সাথে পেয়ে যাবে
 
-## 🔧 Admin / Management
+## ⚙️ Admin Panel
 
-- Apps যোগ/এডিট করা হয় Firebase Realtime Database-এর `apps` node-এ
-- Website name, logo URL, APK link → `settings` node-এ
-- Users, reports, visitors → `users`, `reports`, `visitors` node-এ
+Admin Panel এখন এই repo-তেই আছে — deploy করার পর **`/admin`** URL-এ পাওয়া যাবে
+(যেমন `https://your-domain.com/admin`)। আগের মতোই Firebase `admins` node-এর
+username/password দিয়ে login হয়।
+
+Admin Panel থেকে করা যায়:
+
+- 📊 **Dashboard** — users, apps, reports, visitors, downloads, reviews, **total & আজকের ad impressions**
+- 🎯 **Ads Manager** — ad add/remove/edit, on/off switch, প্রতিটা ad-এর code দেখা/পরিবর্তন,
+  কোন ad কোথায় বসবে (placements), প্রতি slot-এ max কতগুলো ad, per-ad & per-slot impressions
+- ➕ Apps add/edit/delete, 👥 Users, 📊 Reports, 👥 Visitor tracking details
+- ⚙️ Settings — admin credentials, website name, logo
+
+> 📝 পুরনো **APK download system বাদ দেওয়া হয়েছে** — app টা এখন সম্পূর্ণ PWA,
+> userরা browser থেকেই "Install App" করতে পারে।
+
+### Ads data model (Firebase)
+
+```
+ads/<pushKey>              → { name, code, placements[], enabled, createdAt, updatedAt }
+settings/adsInitialized    → true (Ads Manager প্রথমবার খুললেই set হয়)
+settings/adsMaxPerSlot     → প্রতি placement-এ সর্বোচ্চ কতগুলো ad (1–3)
+adStats/total              → সর্বমোট impressions
+adStats/perAd/<adKey>      → per-ad impressions
+adStats/perSlot/<slot>     → per-placement impressions
+adStats/daily/<YYYYMMDD>   → দিনভিত্তিক impressions
+```
+
+Placements: `home_top`, `home_mid`, `home_bottom`, `games_top`, `apps_top`,
+`detail_bottom`, `floating` (social bar / popunder টাইপ)।
 
 ---
 

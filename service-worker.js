@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'samweb-static-v11';
-const RUNTIME_CACHE = 'samweb-runtime-v11';
+const STATIC_CACHE = 'samweb-static-v12';
+const RUNTIME_CACHE = 'samweb-runtime-v12';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -25,8 +25,10 @@ const EXTERNAL_ASSETS = [
 function isBypassRequest(url) {
   return (
     url.hostname.includes("firebasedatabase.app") ||
+    url.hostname.includes("firebaseio.com") ||
     url.hostname.includes("api.ipify.org") ||
-    url.hostname.includes("effectivecpmnetwork.com")
+    url.hostname.includes("effectivecpmnetwork.com") ||
+    url.hostname.includes("googleapis.com")
   );
 }
 
@@ -76,6 +78,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (!url.protocol.startsWith('http')) return;
   if (isBypassRequest(url)) return;
+
+  // Admin panel must always come straight from the network —
+  // never serve the storefront shell for /admin navigations.
+  if (url.origin === self.location.origin && url.pathname.startsWith('/admin')) return;
 
   event.respondWith((async () => {
     const staticCache = await caches.open(STATIC_CACHE);

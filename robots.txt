@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /admin
 
 Sitemap: https://samva-app-store.firebaseapp.com/sitemap.xml
