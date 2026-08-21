@@ -1346,8 +1346,7 @@ a {
   flex: 1;
 }
 
-.nav-item,
-.nav-item-apk {
+.nav-item {
   width: 100%;
   display: flex;
   align-items: center;
@@ -1372,15 +1371,49 @@ a {
   color: var(--text);
 }
 
-.nav-item-apk {
-  color: #fff;
-  background: linear-gradient(135deg, var(--primary), var(--primary-2));
-  font-weight: 800;
-}
-
 .nav-icon {
   width: 18px;
   text-align: center;
+}
+
+/* ---------- Ad slots (managed from Admin Panel → Ads Manager) ---------- */
+.ad-slot {
+  margin: 18px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ad-unit {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.ad-tag {
+  font-size: 0.6rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.ad-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 30px;
+}
+
+.ad-body img,
+.ad-body iframe {
+  max-width: 100%;
 }
 
 .side-user-info {

@@ -115,6 +115,9 @@
     </div>
   </section>
 
+  <!-- AD SLOT: home top (managed from Admin Panel → Ads Manager) -->
+  <div class="container"><div class="ad-slot hidden" data-ad-slot="home_top"></div></div>
+
   <!-- HERO -->
   <section class="hero-section">
     <div class="container">
@@ -166,6 +169,9 @@
     </div>
   </section>
 
+  <!-- AD SLOT: home middle -->
+  <div class="container"><div class="ad-slot hidden" data-ad-slot="home_mid"></div></div>
+
   <!-- ALL APPS -->
   <section class="content-section" id="appsSection">
     <div class="container">
@@ -177,6 +183,9 @@
       <div class="apps-grid" id="appsGrid" style="margin-top:10px;"><div class="spinner"></div></div>
     </div>
   </section>
+
+  <!-- AD SLOT: home bottom -->
+  <div class="container"><div class="ad-slot hidden" data-ad-slot="home_bottom"></div></div>
 
   <!-- FOOTER -->
   <footer class="site-footer">
@@ -203,7 +212,6 @@
           <button class="footer-link" onclick="openReport()">Report Us</button>
           <button class="footer-link" onclick="openAbout()">About</button>
           <button class="footer-link" id="installBtn" onclick="triggerInstallPrompt()">Install App</button>
-          <button class="footer-link" onclick="openApkDownload()">Android APK</button>
         </div>
       </div>
       <p class="footer-note" style="text-align:center;margin-top:14px;">© 2026 SamWeb Store. All rights reserved.</p>
@@ -240,6 +248,7 @@
       <h2 class="section-title">🎮 Games</h2>
       <span class="section-meta" id="gamesCount"></span>
     </div>
+    <div class="ad-slot hidden" data-ad-slot="games_top"></div>
     <div class="apps-grid" id="gamesGrid"></div>
   </div>
 </div>
@@ -251,6 +260,7 @@
       <h2 class="section-title">📱 Apps</h2>
       <span class="section-meta" id="appsPageCount"></span>
     </div>
+    <div class="ad-slot hidden" data-ad-slot="apps_top"></div>
     <div class="apps-grid" id="appsPageGrid"></div>
   </div>
 </div>
@@ -499,8 +509,8 @@
   </div>
 </noscript>
 
-<!-- Social Bar Ad -->
-<script src="https://pl30953956.effectivecpmnetwork.com/6b/e0/7d/6be07d26bb1585e42fa3eafbebc5a187.js"></script>
+<!-- Floating ad slot (social bar / popup style scripts — managed from Admin Panel → Ads Manager) -->
+<div class="ad-slot-floating" data-ad-slot="floating" style="display:contents;"></div>
 
 <script type="module" src="app.js"></script>
 </body>
