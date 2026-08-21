@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'samweb-static-v1';
-const RUNTIME_CACHE = 'samweb-runtime-v1';
+const STATIC_CACHE = 'samweb-static-v11';
+const RUNTIME_CACHE = 'samweb-runtime-v11';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -23,7 +23,11 @@ const EXTERNAL_ASSETS = [
 ];
 
 function isBypassRequest(url) {
-  return url.hostname.includes('firebasedatabase.app') || url.hostname.includes('api.ipify.org');
+  return (
+    url.hostname.includes("firebasedatabase.app") ||
+    url.hostname.includes("api.ipify.org") ||
+    url.hostname.includes("effectivecpmnetwork.com")
+  );
 }
 
 async function revalidate(request) {
