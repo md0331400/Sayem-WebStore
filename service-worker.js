@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'samweb-static-v3';
-const RUNTIME_CACHE = 'samweb-runtime-v3';
+const STATIC_CACHE = 'samweb-static-v4';
+const RUNTIME_CACHE = 'samweb-runtime-v4';
 const CORE_ASSETS = [
   './',
   './index.html',

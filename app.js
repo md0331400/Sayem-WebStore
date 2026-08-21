@@ -297,10 +297,10 @@ function registerServiceWorker() {
 function createParticles() {
   const wrap = $("particles");
   if (!wrap) return;
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 10; i++) {
     const p = document.createElement("div");
     p.className = "particle";
-    const size = Math.random() * 7 + 3;
+    const size = Math.random() * 5 + 2;
     p.style.width = `${size}px`;
     p.style.height = `${size}px`;
     p.style.left = `${Math.random() * 100}%`;
