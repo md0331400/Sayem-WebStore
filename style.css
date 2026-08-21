@@ -430,29 +430,54 @@ a {
   min-width: 84px;
 }
 
-/* ---------- Feature banner ---------- */
+/* ---------- Feature banner (auto-sliding carousel) ---------- */
 .banner-section {
   padding: 14px 0 0;
 }
 
 .feature-banner {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 20px;
-  align-items: center;
-  padding: 22px 24px;
+  position: relative;
+  overflow: hidden;
   border-radius: var(--radius-lg);
   background: var(--banner-bg);
   border: 1px solid rgba(255, 138, 36, 0.3);
   box-shadow: var(--shadow);
-  overflow: hidden;
+}
+
+.banner-slides {
+  position: relative;
+}
+
+.banner-slide {
+  display: none;
+  grid-template-columns: 1fr auto;
+  gap: 30px;
+  align-items: center;
+  min-height: 280px;
+  padding: 34px 56px 42px;
+}
+
+.banner-slide.active {
+  display: grid;
+  animation: bannerFade 0.5s ease;
+}
+
+@keyframes bannerFade {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .banner-copy {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -467,24 +492,31 @@ a {
 }
 
 .banner-title {
-  font-size: clamp(1.35rem, 2.8vw, 1.9rem);
+  font-size: clamp(1.6rem, 3.4vw, 2.4rem);
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1.08;
   color: var(--text);
 }
 
 .banner-desc {
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   color: var(--text-dim);
   line-height: 1.55;
-  max-width: 54ch;
+  max-width: 56ch;
 }
 
 .banner-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  font-size: 0.8rem;
+  align-items: center;
+  gap: 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+.banner-meta span + span::before {
+  content: "·";
+  margin: 0 9px;
   color: var(--text-soft);
 }
 
@@ -492,7 +524,7 @@ a {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .feature-banner .btn-ghost {
@@ -506,9 +538,9 @@ a {
 }
 
 .banner-icon-shell {
-  width: 108px;
-  height: 108px;
-  border-radius: 24px;
+  width: 150px;
+  height: 150px;
+  border-radius: 32px;
   background: var(--card);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
@@ -524,7 +556,75 @@ a {
   object-fit: cover;
   display: grid;
   place-items: center;
-  font-size: 3.2rem;
+  font-size: 4.2rem;
+}
+
+/* Carousel controls */
+.banner-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 1.4rem;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  z-index: 2;
+  box-shadow: var(--shadow-sm);
+  opacity: 0.95;
+  transition: 0.2s ease;
+}
+
+.banner-nav:hover {
+  opacity: 1;
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+.banner-nav.prev {
+  left: 14px;
+}
+
+.banner-nav.next {
+  right: 14px;
+}
+
+.banner-dots {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 7px;
+  z-index: 2;
+}
+
+.banner-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border-radius: 999px;
+  border: none;
+  background: var(--text-soft);
+  opacity: 0.45;
+  cursor: pointer;
+  transition: 0.25s ease;
+}
+
+.banner-dot:hover {
+  opacity: 0.8;
+}
+
+.banner-dot.active {
+  width: 26px;
+  background: var(--primary);
+  opacity: 1;
 }
 
 /* ---------- Hero ---------- */
@@ -858,7 +958,7 @@ a {
 
 /* Row action button (fake, whole row opens details) */
 .app-card::after {
-  content: "⬇ Download";
+  content: "Download";
   grid-area: action;
   align-self: center;
   padding: 7px 14px;
@@ -1852,31 +1952,49 @@ a {
     padding: 10px 0 0;
   }
 
-  .feature-banner {
+  .banner-slide {
     grid-template-columns: 1fr;
     gap: 14px;
-    padding: 18px;
-    border-radius: var(--radius-md);
+    min-height: 0;
+    padding: 20px 52px 36px;
   }
 
-  .banner-icon-shell {
-    width: 84px;
-    height: 84px;
-    border-radius: 20px;
+  .banner-slide .banner-icon-shell {
+    width: 96px;
+    height: 96px;
+    border-radius: 22px;
     order: -1;
   }
 
   .banner-icon-shell img,
   .banner-icon-shell span {
-    font-size: 2.4rem;
+    font-size: 2.8rem;
   }
 
   .banner-title {
-    font-size: 1.3rem;
+    font-size: 1.4rem;
   }
 
   .banner-desc {
     font-size: 0.84rem;
+  }
+
+  .banner-nav {
+    width: 34px;
+    height: 34px;
+    font-size: 1.1rem;
+  }
+
+  .banner-nav.prev {
+    left: 8px;
+  }
+
+  .banner-nav.next {
+    right: 8px;
+  }
+
+  .banner-dots {
+    bottom: 10px;
   }
 
   .hero-section {
@@ -2154,15 +2272,31 @@ a {
     width: min(calc(100% - 20px), var(--container));
   }
 
-  .feature-banner {
-    padding: 14px;
+  .banner-slide {
+    padding: 16px 46px 32px;
     gap: 10px;
   }
 
-  .banner-icon-shell {
-    width: 72px;
-    height: 72px;
-    border-radius: 16px;
+  .banner-slide .banner-icon-shell {
+    width: 80px;
+    height: 80px;
+    border-radius: 18px;
+  }
+
+  .banner-icon-shell img,
+  .banner-icon-shell span {
+    font-size: 2.2rem;
+  }
+
+  .banner-title {
+    font-size: 1.25rem;
+  }
+
+  .banner-desc {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .banner-actions .btn {
@@ -2187,7 +2321,7 @@ a {
   }
 
   .app-card::after {
-    content: "⬇ Get";
+    content: "Get";
     padding: 6px 10px;
   }
 

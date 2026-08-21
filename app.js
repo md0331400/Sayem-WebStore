@@ -417,7 +417,7 @@ function buildSideMenu() {
   if (canShowInstallUI()) {
     const installBtn = document.createElement("button");
     installBtn.className = "nav-item";
-    installBtn.innerHTML = `<span class="nav-icon">⬇️</span>${installLabel}`;
+    installBtn.innerHTML = `<span class="nav-icon">📲</span>${installLabel}`;
     installBtn.onclick = () => triggerInstallPrompt();
     nav.appendChild(installBtn);
   }
@@ -828,40 +828,106 @@ function updateHeroMetrics(source = allApps) {
   if ($("heroRatingCount")) $("heroRatingCount").textContent = totalRatings;
 }
 
+// ============ FEATURE BANNER (auto-sliding) ============
+let bannerTimer = null;
+let bannerIndex = 0;
+
+function clearBannerTimer() {
+  if (bannerTimer) {
+    clearInterval(bannerTimer);
+    bannerTimer = null;
+  }
+}
+
+function startBannerTimer() {
+  clearBannerTimer();
+  const slides = document.querySelectorAll("#featureBanner .banner-slide");
+  if (slides.length > 1) {
+    bannerTimer = setInterval(() => moveBanner(1), 4000);
+  }
+}
+
+function moveBanner(dir) {
+  const slides = document.querySelectorAll("#featureBanner .banner-slide");
+  const dots = document.querySelectorAll("#featureBanner .banner-dot");
+  if (!slides.length) return;
+  slides[bannerIndex]?.classList.remove("active");
+  dots[bannerIndex]?.classList.remove("active");
+  bannerIndex = (bannerIndex + dir + slides.length) % slides.length;
+  slides[bannerIndex]?.classList.add("active");
+  dots[bannerIndex]?.classList.add("active");
+  startBannerTimer();
+}
+window.moveBanner = moveBanner;
+
+function goBanner(index) {
+  const slides = document.querySelectorAll("#featureBanner .banner-slide");
+  const dots = document.querySelectorAll("#featureBanner .banner-dot");
+  if (!slides.length || index === bannerIndex) return;
+  slides[bannerIndex]?.classList.remove("active");
+  dots[bannerIndex]?.classList.remove("active");
+  bannerIndex = index;
+  slides[bannerIndex]?.classList.add("active");
+  dots[bannerIndex]?.classList.add("active");
+  startBannerTimer();
+}
+window.goBanner = goBanner;
+
 function renderHeroBanner(source = allApps) {
   const banner = $("featureBanner");
   if (!banner) return;
 
-  const featured = getFeaturedApps(source);
-  if (!featured.length) {
+  clearBannerTimer();
+  bannerIndex = 0;
+
+  // Top apps first → lowest apps later (auto slides through them)
+  const apps = [...source]
+    .sort((a, b) => (b.downloads || 0) - (a.downloads || 0))
+    .slice(0, 10);
+
+  if (!apps.length) {
     banner.classList.add("hidden");
     banner.innerHTML = "";
     return;
   }
 
-  const app = featured[0];
+  const slideHtml = (app, i) => `
+    <div class="banner-slide ${i === 0 ? "active" : ""}">
+      <div class="banner-copy">
+        <span class="banner-badge">🔥 Featured App</span>
+        <h2 class="banner-title">${escapeHtml(app.name)}</h2>
+        <p class="banner-desc">${escapeHtml((app.description || "Discover and download this app now.").slice(0, 150))}</p>
+        <div class="banner-meta">
+          <span>★ ${getAverageRating(app)}</span>
+          <span>${formatNum(app.downloads || 0)} downloads</span>
+          <span>${escapeHtml(app.category || "App")}</span>
+        </div>
+        <div class="banner-actions">
+          <button class="btn btn-primary" onclick='downloadApp(${toJsString(app.key)}, ${toJsString(app.link || "")})'>Download</button>
+          <button class="btn btn-ghost" onclick='openAppDetail(${toJsString(app.key)})'>Details</button>
+        </div>
+      </div>
+      <div class="banner-icon-shell">
+        ${app.imageUrl && app.imageUrl.startsWith("http")
+          ? `<img src="${escapeHtml(app.imageUrl)}" alt="${escapeHtml(app.name)} icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"><span style="display:none">${escapeHtml(app.icon || "📱")}</span>`
+          : `<span>${escapeHtml(app.icon || "📱")}</span>`}
+      </div>
+    </div>`;
+
   banner.classList.remove("hidden");
   banner.innerHTML = `
-    <div class="banner-copy">
-      <span class="banner-badge">🔥 Featured App</span>
-      <h2 class="banner-title">${escapeHtml(app.name)}</h2>
-      <p class="banner-desc">${escapeHtml((app.description || "Discover and download this app now.").slice(0, 140))}</p>
-      <div class="banner-meta">
-        <span>⭐ ${getAverageRating(app)}</span>
-        <span>⬇ ${formatNum(app.downloads || 0)} downloads</span>
-        <span>${escapeHtml(app.category || "App")}</span>
-      </div>
-      <div class="banner-actions">
-        <button class="btn btn-primary" onclick='downloadApp(${toJsString(app.key)}, ${toJsString(app.link || "")})'>⬇ Download</button>
-        <button class="btn btn-ghost" onclick='openAppDetail(${toJsString(app.key)})'>Details</button>
-      </div>
+    <div class="banner-slides">
+      ${apps.map((app, i) => slideHtml(app, i)).join("")}
     </div>
-    <div class="banner-icon-shell">
-      ${app.imageUrl && app.imageUrl.startsWith("http")
-        ? `<img src="${escapeHtml(app.imageUrl)}" alt="${escapeHtml(app.name)} icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"><span style="display:none">${escapeHtml(app.icon || "📱")}</span>`
-        : `<span>${escapeHtml(app.icon || "📱")}</span>`}
-    </div>
+    ${apps.length > 1 ? `
+      <button class="banner-nav prev" aria-label="Previous app" onclick="moveBanner(-1)">‹</button>
+      <button class="banner-nav next" aria-label="Next app" onclick="moveBanner(1)">›</button>
+      <div class="banner-dots">
+        ${apps.map((app, i) => `<button class="banner-dot ${i === 0 ? "active" : ""}" aria-label="Go to slide ${i + 1}" onclick="goBanner(${i})"></button>`).join("")}
+      </div>` : ""}
   `;
+
+  if (apps.length > 1) startBannerTimer();
 }
 
 function renderCategoryFilters(source = allApps) {
@@ -899,8 +965,8 @@ function renderFeaturedGrid(source = allApps) {
           <p class="featured-desc">${escapeHtml((app.description || "No description available.").slice(0, 120))}${(app.description || "").length > 120 ? "…" : ""}</p>
         </div>
         <div class="featured-meta">
-          <span>⭐ ${getAverageRating(app)}</span>
-          <span>⬇ ${formatNum(app.downloads || 0)}</span>
+          <span>★ ${getAverageRating(app)}</span>
+          <span>${formatNum(app.downloads || 0)} downloads</span>
         </div>
       </article>
     `)
@@ -958,8 +1024,8 @@ function renderApps(apps) {
           </div>
         </div>
         <div class="app-rating">
-          <span>⭐ ${getAverageRating(app)}</span>
-          <span>⬇ ${formatNum(app.downloads || 0)}</span>
+          <span>★ ${getAverageRating(app)}</span>
+          <span>${formatNum(app.downloads || 0)} downloads</span>
         </div>
         <p class="app-desc-snippet">${escapeHtml((app.description || "No description available.").slice(0, 110))}${(app.description || "").length > 110 ? "…" : ""}</p>
       </article>
@@ -1124,7 +1190,7 @@ function openAppDetail(key) {
           <h2 class="app-detail-name">${escapeHtml(app.name)}</h2>
           <div class="app-detail-subline">Install on your favorite device and keep this listing within reach.</div>
           <div class="app-stats">
-            <div class="app-stat"><span class="app-stat-value">⭐ ${avgRating}</span><span class="app-stat-label">Average Rating</span></div>
+            <div class="app-stat"><span class="app-stat-value">★ ${avgRating}</span><span class="app-stat-label">Average Rating</span></div>
             <div class="app-stat"><span class="app-stat-value">${formatNum(app.downloads || 0)}</span><span class="app-stat-label">Downloads</span></div>
             <div class="app-stat"><span class="app-stat-value">${reviewItems.length}</span><span class="app-stat-label">Reviews</span></div>
           </div>
@@ -1134,7 +1200,7 @@ function openAppDetail(key) {
       <div class="app-desc">${escapeHtml(app.description || "No description available.")}</div>
 
       <div class="detail-actions">
-        <button class="btn btn-primary" onclick='downloadApp(${toJsString(app.key)}, ${toJsString(app.link || "")})'>⬇️ Download Now</button>
+        <button class="btn btn-primary" onclick='downloadApp(${toJsString(app.key)}, ${toJsString(app.link || "")})'>Download Now</button>
         <button class="btn btn-ghost" onclick="openReport()">Need help?</button>
       </div>
       <div class="detail-note">${currentUser ? "You can rate and download instantly with your logged-in account." : "Login is required before downloading or reviewing apps."}</div>
@@ -1411,6 +1477,13 @@ function setupGlobalEvents() {
     closeModal("aboutOverlay");
     document.querySelectorAll(".screenshot-lightbox").forEach((el) => el.remove());
   });
+
+  // Pause banner auto-slide while the user is interacting with it
+  const banner = $("featureBanner");
+  if (banner) {
+    banner.addEventListener("pointerenter", clearBannerTimer);
+    banner.addEventListener("pointerleave", startBannerTimer);
+  }
 }
 
 function initShell() {
