@@ -295,8 +295,85 @@ function showPage(id) {
   closeMenu();
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (id === "homePage") loadApps();
+  if (id === "searchPage") {
+    setTimeout(() => {
+      const input = $("searchPageInput");
+      if (input) input.focus();
+    }, 80);
+  }
 }
 window.showPage = showPage;
+
+function goHome() {
+  showPage("homePage");
+  scrollToTop();
+}
+window.goHome = goHome;
+
+function openSearch() {
+  showPage("searchPage");
+}
+window.openSearch = openSearch;
+
+// ============ SEARCH PAGE ============
+function renderSearchResults() {
+  const input = $("searchPageInput");
+  const wrap = $("searchResults");
+  if (!wrap) return;
+
+  const q = (input?.value || "").trim().toLowerCase();
+  const countEl = $("searchCount");
+  const clearBtn = $("searchClearBtn");
+  const popularBox = $("popularBox");
+
+  if (clearBtn) clearBtn.style.display = q ? "block" : "none";
+  if (popularBox) popularBox.classList.toggle("hidden", !!q);
+
+  if (!q) {
+    if (countEl) countEl.textContent = "";
+    wrap.innerHTML = "";
+    renderPopularSearches();
+    return;
+  }
+
+  const results = allApps.filter((app) => {
+    const hay = `${app.name || ""} ${app.category || ""} ${app.description || ""}`.toLowerCase();
+    return hay.includes(q);
+  });
+
+  if (countEl) countEl.textContent = results.length === 1 ? "1 result found" : `${results.length} results found`;
+
+  wrap.innerHTML = results.length
+    ? results.map(appRowHtml).join("")
+    : `<div class="empty-state">No apps found for "${escapeHtml(q)}".</div>`;
+}
+window.renderSearchResults = renderSearchResults;
+
+function renderPopularSearches() {
+  const wrap = $("popularSearches");
+  if (!wrap) return;
+  const popular = [...allApps].sort((a, b) => (b.downloads || 0) - (a.downloads || 0)).slice(0, 8);
+  wrap.innerHTML = popular.length
+    ? popular
+        .map((app) => `<button class="popular-chip" onclick="setSearchQuery(${toJsString(app.name)})">${escapeHtml(app.name)}</button>`)
+        .join("")
+    : "";
+}
+
+function setSearchQuery(query) {
+  const input = $("searchPageInput");
+  if (input) input.value = query;
+  renderSearchResults();
+}
+window.setSearchQuery = setSearchQuery;
+
+function clearSearch() {
+  const input = $("searchPageInput");
+  if (input) input.value = "";
+  renderSearchResults();
+  if (input) input.focus();
+}
+window.clearSearch = clearSearch;
 
 function scrollToTop() {
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -395,9 +472,13 @@ function buildSideMenu() {
   footer.innerHTML = "";
 
   const items = [
-    { label: "Home", icon: "🏠", action: () => navigateToSection("homePage") },
-    { label: "Featured", icon: "✨", action: () => navigateToSection("featuredSection") },
-    { label: "All Apps", icon: "🧩", action: () => navigateToSection("appsSection") },
+    { label: "Home", icon: "🏠", action: () => showPage("homePage") },
+    { label: "Games", icon: "🎮", action: () => showPage("gamesPage") },
+    { label: "App", icon: "📱", action: () => showPage("appsPage") },
+    { label: "FAQ", icon: "❓", action: () => showPage("faqPage") },
+    { label: "Disclaimer", icon: "⚠️", action: () => showPage("disclaimerPage") },
+    { label: "Terms of Use", icon: "📄", action: () => showPage("termsPage") },
+    { label: "Privacy Policy", icon: "🔒", action: () => showPage("privacyPage") },
     { label: "Report Us", icon: "📣", action: openReport },
     { label: "About", icon: "ℹ️", action: openAbout },
     { label: getSavedTheme() === "dark" ? "Switch to Light" : "Switch to Dark", icon: getSavedTheme() === "dark" ? "☀️" : "🌙", action: toggleTheme }
@@ -896,21 +977,21 @@ function renderHeroBanner(source = allApps) {
       <div class="banner-copy">
         <span class="banner-badge">🔥 Featured App</span>
         <h2 class="banner-title">${escapeHtml(app.name)}</h2>
-        <p class="banner-desc">${escapeHtml((app.description || "Discover and download this app now.").slice(0, 150))}</p>
         <div class="banner-meta">
           <span>★ ${getAverageRating(app)}</span>
           <span>${formatNum(app.downloads || 0)} downloads</span>
           <span>${escapeHtml(app.category || "App")}</span>
         </div>
-        <div class="banner-actions">
-          <button class="btn btn-primary" onclick='downloadApp(${toJsString(app.key)}, ${toJsString(app.link || "")})'>Download</button>
-          <button class="btn btn-ghost" onclick='openAppDetail(${toJsString(app.key)})'>Details</button>
-        </div>
+        <p class="banner-desc">${escapeHtml((app.description || "Discover and download this app now.").slice(0, 150))}</p>
+        <button class="btn btn-ghost btn-sm" onclick='openAppDetail(${toJsString(app.key)})'>Details</button>
       </div>
-      <div class="banner-icon-shell">
-        ${app.imageUrl && app.imageUrl.startsWith("http")
-          ? `<img src="${escapeHtml(app.imageUrl)}" alt="${escapeHtml(app.name)} icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"><span style="display:none">${escapeHtml(app.icon || "📱")}</span>`
-          : `<span>${escapeHtml(app.icon || "📱")}</span>`}
+      <div class="banner-side">
+        <div class="banner-icon-shell">
+          ${app.imageUrl && app.imageUrl.startsWith("http")
+            ? `<img src="${escapeHtml(app.imageUrl)}" alt="${escapeHtml(app.name)} icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"><span style="display:none">${escapeHtml(app.icon || "📱")}</span>`
+            : `<span>${escapeHtml(app.icon || "📱")}</span>`}
+        </div>
+        <button class="btn btn-primary" onclick='downloadApp(${toJsString(app.key)}, ${toJsString(app.link || "")})'>Download</button>
       </div>
     </div>`;
 
@@ -974,15 +1055,29 @@ function renderFeaturedGrid(source = allApps) {
 }
 
 function applyAppFilters(source = allApps) {
-  const query = ($("searchInput")?.value || "").trim().toLowerCase();
   return source.filter((app) => {
     const category = app.category || "Other";
-    const matchesCategory = activeCategory === "All" || category === activeCategory;
-    if (!matchesCategory) return false;
-    if (!query) return true;
-    const haystack = `${app.name || ""} ${category} ${app.description || ""}`.toLowerCase();
-    return haystack.includes(query);
+    return activeCategory === "All" || category === activeCategory;
   });
+}
+
+function appRowHtml(app) {
+  return `
+    <article class="app-card" onclick='openAppDetail(${toJsString(app.key)})'>
+      <div class="app-card-head">
+        ${getCardIconHtml(app)}
+        <div>
+          <h3 class="app-name">${escapeHtml(app.name)}</h3>
+          <div class="app-category">${escapeHtml(app.category || "App")}</div>
+        </div>
+      </div>
+      <div class="app-rating">
+        <span>★ ${getAverageRating(app)}</span>
+        <span>${formatNum(app.downloads || 0)} downloads</span>
+      </div>
+      <p class="app-desc-snippet">${escapeHtml((app.description || "No description available.").slice(0, 110))}${(app.description || "").length > 110 ? "…" : ""}</p>
+    </article>
+  `;
 }
 
 function renderApps(apps) {
@@ -1013,24 +1108,36 @@ function renderApps(apps) {
     return;
   }
 
-  grid.innerHTML = apps
-    .map((app) => `
-      <article class="app-card" onclick='openAppDetail(${toJsString(app.key)})'>
-        <div class="app-card-head">
-          ${getCardIconHtml(app)}
-          <div>
-            <h3 class="app-name">${escapeHtml(app.name)}</h3>
-            <div class="app-category">${escapeHtml(app.category || "App")}</div>
-          </div>
-        </div>
-        <div class="app-rating">
-          <span>★ ${getAverageRating(app)}</span>
-          <span>${formatNum(app.downloads || 0)} downloads</span>
-        </div>
-        <p class="app-desc-snippet">${escapeHtml((app.description || "No description available.").slice(0, 110))}${(app.description || "").length > 110 ? "…" : ""}</p>
-      </article>
-    `)
-    .join("");
+  grid.innerHTML = apps.map(appRowHtml).join("");
+  renderGamesAppsPages();
+  renderPopularSearches();
+  renderSearchResults();
+}
+
+function isGameApp(app) {
+  return ((app.category || "").toLowerCase().includes("game"));
+}
+
+function renderGamesAppsPages() {
+  const gamesGrid = $("gamesGrid");
+  if (gamesGrid) {
+    const games = allApps.filter(isGameApp);
+    const gamesCount = $("gamesCount");
+    if (gamesCount) gamesCount.textContent = games.length ? `${games.length} games available` : "";
+    gamesGrid.innerHTML = games.length
+      ? games.map(appRowHtml).join("")
+      : '<div class="empty-state">No games yet. Admin can add some anytime.</div>';
+  }
+
+  const appsPageGrid = $("appsPageGrid");
+  if (appsPageGrid) {
+    const apps = allApps.filter((app) => !isGameApp(app));
+    const appsPageCount = $("appsPageCount");
+    if (appsPageCount) appsPageCount.textContent = apps.length ? `${apps.length} apps available` : "";
+    appsPageGrid.innerHTML = apps.length
+      ? apps.map(appRowHtml).join("")
+      : '<div class="empty-state">No apps yet. Admin can add some anytime.</div>';
+  }
 }
 
 function loadApps() {
@@ -1435,8 +1542,10 @@ function readSearchParam() {
   try {
     const q = new URLSearchParams(window.location.search).get("q");
     if (q) {
-      const input = $("searchInput");
+      const input = $("searchPageInput");
       if (input) input.value = q;
+      showPage("searchPage");
+      renderSearchResults();
     }
   } catch {}
 }

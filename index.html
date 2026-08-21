@@ -81,7 +81,11 @@
 <!-- ============ HEADER ============ -->
 <header class="site-header">
   <div class="container nav-shell">
-    <div class="brand" onclick="scrollToTop()" role="link" tabindex="0" aria-label="SamWeb Store home">
+    <div class="header-left">
+      <div class="menu-btn" onclick="openMenu()" aria-label="Open menu"><span></span><span></span><span></span></div>
+    </div>
+
+    <div class="brand" onclick="goHome()" role="link" tabindex="0" aria-label="SamWeb Store home">
       <div class="brand-mark">
         <img id="headerLogoImg" src="icons/icon-192.png" alt="SamWeb Store logo" style="display:none;">
         <div class="brand-emoji" id="headerLogoEmoji">🛒</div>
@@ -92,24 +96,11 @@
       </div>
     </div>
 
-    <div class="search-wrap">
-      <span class="search-icon">🔍</span>
-      <input type="text" id="searchInput" placeholder="Search apps &amp; games..." oninput="filterApps()" aria-label="Search apps and games">
-    </div>
-
-    <nav class="desktop-nav" aria-label="Main navigation">
-      <button class="nav-link" onclick="navigateToSection('homePage')">Home</button>
-      <button class="nav-link" onclick="navigateToSection('featuredSection')">Featured</button>
-      <button class="nav-link" onclick="navigateToSection('appsSection')">All Apps</button>
-      <button class="nav-link" onclick="openReport()">Report Us</button>
-      <button class="nav-link" onclick="openAbout()">About</button>
-    </nav>
-
     <div class="nav-actions">
       <div class="header-user" id="headerUser" style="display:none;"></div>
+      <button class="icon-btn" onclick="openSearch()" aria-label="Search apps and games">🔍</button>
       <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Switch to dark mode">🌙</button>
       <button class="btn btn-primary nav-auth-btn" id="headerLoginBtn" onclick="showPage('authPage')">🔑 Login</button>
-      <div class="menu-btn" onclick="openMenu()" aria-label="Open menu"><span></span><span></span><span></span></div>
     </div>
   </div>
 </header>
@@ -219,6 +210,149 @@
     </div>
   </footer>
 </main>
+
+<!-- ============ SEARCH PAGE ============ -->
+<div id="searchPage" class="page">
+  <div class="container search-page">
+    <div class="search-page-head">
+      <button class="btn btn-ghost btn-sm" onclick="goHome()">← Back</button>
+      <div class="search-wrap search-page-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchPageInput" placeholder="Search apps &amp; games..." oninput="renderSearchResults()" aria-label="Search apps and games">
+        <button class="search-clear" id="searchClearBtn" onclick="clearSearch()" aria-label="Clear search" style="display:none;">✕</button>
+      </div>
+    </div>
+
+    <div id="popularBox">
+      <div class="popular-title">Popular Searches</div>
+      <div class="popular-list" id="popularSearches"></div>
+    </div>
+
+    <div class="section-meta" id="searchCount" style="margin:16px 0 8px;"></div>
+    <div class="apps-grid" id="searchResults"></div>
+  </div>
+</div>
+
+<!-- ============ GAMES PAGE ============ -->
+<div id="gamesPage" class="page">
+  <div class="container page-container">
+    <div class="section-header section-header-wrap">
+      <h2 class="section-title">🎮 Games</h2>
+      <span class="section-meta" id="gamesCount"></span>
+    </div>
+    <div class="apps-grid" id="gamesGrid"></div>
+  </div>
+</div>
+
+<!-- ============ APPS PAGE ============ -->
+<div id="appsPage" class="page">
+  <div class="container page-container">
+    <div class="section-header section-header-wrap">
+      <h2 class="section-title">📱 Apps</h2>
+      <span class="section-meta" id="appsPageCount"></span>
+    </div>
+    <div class="apps-grid" id="appsPageGrid"></div>
+  </div>
+</div>
+
+<!-- ============ FAQ PAGE ============ -->
+<div id="faqPage" class="page">
+  <div class="container page-container">
+    <h1 class="page-title">Frequently Asked Questions</h1>
+    <div class="page-content">
+      <div class="faq-item">
+        <div class="faq-q">How do I download an app or game?</div>
+        <div class="faq-a">Tap the Download button on any app row or on the featured banner. You need to be logged in — after that the download starts and the download count updates automatically.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Is SamWeb Store free?</div>
+        <div class="faq-a">Yes. Browsing, downloading, and reviewing apps on SamWeb Store is completely free.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Do I need an account?</div>
+        <div class="faq-a">You can browse freely, but an account is required to download apps and to submit ratings and reviews.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">How do I rate or review an app?</div>
+        <div class="faq-a">Open the app details, tap the stars to select a rating, write your review, and press Submit Review. You can update your review anytime.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Is it safe to download from here?</div>
+        <div class="faq-a">We curate every listing, but always check the source of any download and review the permissions an app requests on your device.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">I found a broken link or wrong information. What should I do?</div>
+        <div class="faq-a">Please use the Report Us option in the menu and tell us the app name and the issue — we fix it as soon as possible.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DISCLAIMER PAGE ============ -->
+<div id="disclaimerPage" class="page">
+  <div class="container page-container">
+    <h1 class="page-title">Disclaimer</h1>
+    <div class="page-content">
+      <p>SamWeb Store is an independent apps and games discovery platform. We are not affiliated with, endorsed by, or sponsored by Google Play, the Android brand, or any app developer or publisher listed on this website.</p>
+      <h2>App Listings</h2>
+      <p>All app names, logos, icons, screenshots, and trademarks displayed on this website belong to their respective owners and are used only to identify and describe the products. Listing an app does not imply any partnership with its developer.</p>
+      <h2>Downloads</h2>
+      <p>Downloads may be hosted by third-party servers. SamWeb Store does not guarantee the availability, safety, or functionality of any file. Users download and install apps at their own risk and should always verify the source and requested permissions.</p>
+      <h2>Content Accuracy</h2>
+      <p>We try to keep all information accurate and up to date, but we make no warranties about completeness, reliability, or accuracy of any content on this website.</p>
+      <h2>Copyright</h2>
+      <p>If you believe any content on this website infringes your copyright, contact us at <a href="mailto:abusayem0866@gmail.com">abusayem0866@gmail.com</a> and we will remove it promptly.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TERMS OF USE PAGE ============ -->
+<div id="termsPage" class="page">
+  <div class="container page-container">
+    <h1 class="page-title">Terms of Use</h1>
+    <div class="page-content">
+      <p>By accessing or using SamWeb Store, you agree to these Terms of Use. If you do not agree, please do not use the website.</p>
+      <h2>Accounts</h2>
+      <p>When you create an account you must provide accurate information and keep your password safe. You are responsible for all activity that happens under your account.</p>
+      <h2>Acceptable Use</h2>
+      <ul>
+        <li>Do not post spam, abusive, or misleading reviews.</li>
+        <li>Do not attempt to abuse, overload, or hack the website.</li>
+        <li>Do not misuse download counters or any other feature.</li>
+      </ul>
+      <h2>Downloads</h2>
+      <p>Downloads and installs are performed at your own risk. We are not responsible for any damage, data loss, or other issues caused by third-party apps.</p>
+      <h2>Changes</h2>
+      <p>We may update these terms at any time. Continued use of the website after changes means you accept the updated terms.</p>
+      <h2>Contact</h2>
+      <p>Questions about these terms? Email us at <a href="mailto:abusayem0866@gmail.com">abusayem0866@gmail.com</a>.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PRIVACY POLICY PAGE ============ -->
+<div id="privacyPage" class="page">
+  <div class="container page-container">
+    <h1 class="page-title">Privacy Policy</h1>
+    <div class="page-content">
+      <p>Your privacy matters to us. This policy explains what data SamWeb Store collects and how it is used.</p>
+      <h2>Information We Collect</h2>
+      <ul>
+        <li><strong>Account data:</strong> name, email address, phone number, and gender when you sign up.</li>
+        <li><strong>Usage data:</strong> device type, browser, screen resolution, and visit history — used only for site statistics.</li>
+        <li><strong>User content:</strong> ratings and reviews you submit.</li>
+      </ul>
+      <h2>How We Use It</h2>
+      <p>Account data is used to manage your account and login. Usage data helps us understand our visitors and improve the website. We never sell your personal data to anyone.</p>
+      <h2>Storage</h2>
+      <p>Data is stored securely in Firebase Realtime Database. Your login session and theme preference are saved in your browser's local storage.</p>
+      <h2>Third Parties</h2>
+      <p>Download links may lead to third-party websites that have their own privacy policies. We are not responsible for their practices.</p>
+      <h2>Contact</h2>
+      <p>Questions about your data? Email us at <a href="mailto:abusayem0866@gmail.com">abusayem0866@gmail.com</a>.</p>
+    </div>
+  </div>
+</div>
 
 <!-- ============ AUTH PAGE ============ -->
 <div id="authPage" class="page">
