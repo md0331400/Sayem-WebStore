@@ -194,15 +194,9 @@ function hydrateFromCache() {
 function updateConnectionState() {
   const online = navigator.onLine;
   const pill = $("networkPill");
-  const hint = $("installHint");
   if (pill) {
     pill.className = `network-pill ${online ? "online" : "offline"}`;
     pill.textContent = online ? "Online • synced" : "Offline • cached mode";
-  }
-  if (hint) {
-    hint.textContent = online
-      ? "Install once and revisit with a fast offline-ready experience."
-      : "You are offline. Cached content will remain available when possible.";
   }
 }
 
@@ -217,7 +211,7 @@ function updateInstallUI() {
     ? "Add to Dock"
     : "Install App";
 
-  ["installBtn", "heroInstallBtn", "footerInstallBtn", "bannerInstallBtn"].forEach((id) => {
+  ["installBtn", "bannerInstallBtn"].forEach((id) => {
     const btn = $(id);
     if (!btn) return;
     btn.textContent = label;
@@ -292,22 +286,6 @@ function registerServiceWorker() {
   navigator.serviceWorker.register("./service-worker.js", { scope: "./" }).catch((err) => {
     console.warn("Service worker registration failed:", err);
   });
-}
-
-function createParticles() {
-  const wrap = $("particles");
-  if (!wrap) return;
-  for (let i = 0; i < 10; i++) {
-    const p = document.createElement("div");
-    p.className = "particle";
-    const size = Math.random() * 5 + 2;
-    p.style.width = `${size}px`;
-    p.style.height = `${size}px`;
-    p.style.left = `${Math.random() * 100}%`;
-    p.style.animationDuration = `${Math.random() * 12 + 10}s`;
-    p.style.animationDelay = `${Math.random() * 8}s`;
-    wrap.appendChild(p);
-  }
 }
 
 function showPage(id) {
@@ -421,7 +399,8 @@ function buildSideMenu() {
     { label: "Featured", icon: "✨", action: () => navigateToSection("featuredSection") },
     { label: "All Apps", icon: "🧩", action: () => navigateToSection("appsSection") },
     { label: "Report Us", icon: "📣", action: openReport },
-    { label: "About", icon: "ℹ️", action: openAbout }
+    { label: "About", icon: "ℹ️", action: openAbout },
+    { label: getSavedTheme() === "dark" ? "Switch to Light" : "Switch to Dark", icon: getSavedTheme() === "dark" ? "☀️" : "🌙", action: toggleTheme }
   ];
 
   items.forEach((item) => {
@@ -849,32 +828,40 @@ function updateHeroMetrics(source = allApps) {
   if ($("heroRatingCount")) $("heroRatingCount").textContent = totalRatings;
 }
 
-function renderHeroMiniList(source = allApps) {
-  const wrap = $("heroMiniList");
-  if (!wrap) return;
+function renderHeroBanner(source = allApps) {
+  const banner = $("featureBanner");
+  if (!banner) return;
 
-  const featured = getFeaturedApps(source).slice(0, 3);
+  const featured = getFeaturedApps(source);
   if (!featured.length) {
-    wrap.innerHTML = '<div class="mini-placeholder">Curated app highlights will appear here once apps are available.</div>';
+    banner.classList.add("hidden");
+    banner.innerHTML = "";
     return;
   }
 
-  wrap.innerHTML = featured
-    .map((app) => `
-      <div class="mini-app">
-        <div class="mini-app-icon">
-          ${app.imageUrl && app.imageUrl.startsWith("http")
-            ? `<img src="${escapeHtml(app.imageUrl)}" alt="${escapeHtml(app.name)} icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"><span style="display:none">${escapeHtml(app.icon || "📱")}</span>`
-            : `<span>${escapeHtml(app.icon || "📱")}</span>`}
-        </div>
-        <div class="mini-app-meta">
-          <strong>${escapeHtml(app.name)}</strong>
-          <span>${escapeHtml(app.category || "App")} • ${formatNum(app.downloads || 0)} downloads</span>
-        </div>
-        <div class="mini-app-score">⭐ ${getAverageRating(app)}</div>
+  const app = featured[0];
+  banner.classList.remove("hidden");
+  banner.innerHTML = `
+    <div class="banner-copy">
+      <span class="banner-badge">🔥 Featured App</span>
+      <h2 class="banner-title">${escapeHtml(app.name)}</h2>
+      <p class="banner-desc">${escapeHtml((app.description || "Discover and download this app now.").slice(0, 140))}</p>
+      <div class="banner-meta">
+        <span>⭐ ${getAverageRating(app)}</span>
+        <span>⬇ ${formatNum(app.downloads || 0)} downloads</span>
+        <span>${escapeHtml(app.category || "App")}</span>
       </div>
-    `)
-    .join("");
+      <div class="banner-actions">
+        <button class="btn btn-primary" onclick='downloadApp(${toJsString(app.key)}, ${toJsString(app.link || "")})'>⬇ Download</button>
+        <button class="btn btn-ghost" onclick='openAppDetail(${toJsString(app.key)})'>Details</button>
+      </div>
+    </div>
+    <div class="banner-icon-shell">
+      ${app.imageUrl && app.imageUrl.startsWith("http")
+        ? `<img src="${escapeHtml(app.imageUrl)}" alt="${escapeHtml(app.name)} icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"><span style="display:none">${escapeHtml(app.icon || "📱")}</span>`
+        : `<span>${escapeHtml(app.icon || "📱")}</span>`}
+    </div>
+  `;
 }
 
 function renderCategoryFilters(source = allApps) {
@@ -934,7 +921,7 @@ function applyAppFilters(source = allApps) {
 
 function renderApps(apps) {
   updateHeroMetrics(allApps);
-  renderHeroMiniList(allApps);
+  renderHeroBanner(allApps);
   renderCategoryFilters(allApps);
   renderFeaturedGrid(allApps);
 
@@ -1346,6 +1333,48 @@ function openApkDownload() {
 }
 window.openApkDownload = openApkDownload;
 
+// ============ THEME (dark / light) ============
+function getSavedTheme() {
+  try {
+    return localStorage.getItem("samweb_theme") || "light";
+  } catch {
+    return "light";
+  }
+}
+
+function applyTheme(theme, persist = true) {
+  const finalTheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", finalTheme);
+  if (persist) {
+    try {
+      localStorage.setItem("samweb_theme", finalTheme);
+    } catch {}
+  }
+  const toggleBtn = $("themeToggle");
+  if (toggleBtn) {
+    toggleBtn.textContent = finalTheme === "dark" ? "☀️" : "🌙";
+    toggleBtn.setAttribute("aria-label", finalTheme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+  }
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) metaTheme.setAttribute("content", finalTheme === "dark" ? "#0b0d12" : "#ffffff");
+  buildSideMenu();
+}
+
+function toggleTheme() {
+  applyTheme(getSavedTheme() === "dark" ? "light" : "dark");
+}
+window.toggleTheme = toggleTheme;
+
+function readSearchParam() {
+  try {
+    const q = new URLSearchParams(window.location.search).get("q");
+    if (q) {
+      const input = $("searchInput");
+      if (input) input.value = q;
+    }
+  } catch {}
+}
+
 function setupGlobalEvents() {
   window.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
@@ -1385,13 +1414,14 @@ function setupGlobalEvents() {
 }
 
 function initShell() {
-  createParticles();
+  applyTheme(getSavedTheme(), false);
   hydrateFromCache();
   loadSession();
   updateConnectionState();
   updateInstallUI();
   registerServiceWorker();
   setupGlobalEvents();
+  readSearchParam();
 }
 
 function onFirebaseReady() {
