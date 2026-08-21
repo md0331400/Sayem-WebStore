@@ -1953,48 +1953,81 @@ a {
   }
 
   .banner-slide {
-    grid-template-columns: 1fr;
-    gap: 14px;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "icon copy";
+    gap: 12px;
+    align-items: center;
     min-height: 0;
-    padding: 20px 52px 36px;
+    padding: 14px 48px 34px;
   }
 
   .banner-slide .banner-icon-shell {
-    width: 96px;
-    height: 96px;
-    border-radius: 22px;
-    order: -1;
+    grid-area: icon;
+    width: 68px;
+    height: 68px;
+    border-radius: 16px;
   }
 
   .banner-icon-shell img,
   .banner-icon-shell span {
-    font-size: 2.8rem;
+    font-size: 2rem;
+  }
+
+  .banner-copy {
+    grid-area: copy;
+    gap: 4px;
+  }
+
+  .banner-badge {
+    display: none;
   }
 
   .banner-title {
-    font-size: 1.4rem;
+    font-size: 1.05rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .banner-desc {
-    font-size: 0.84rem;
+    display: none;
+  }
+
+  .banner-meta {
+    font-size: 0.74rem;
+  }
+
+  .banner-meta span + span::before {
+    margin: 0 7px;
+  }
+
+  .banner-actions {
+    margin-top: 6px;
+  }
+
+  .banner-actions .btn {
+    padding: 7px 14px;
+    font-size: 0.8rem;
   }
 
   .banner-nav {
-    width: 34px;
-    height: 34px;
-    font-size: 1.1rem;
+    width: 32px;
+    height: 32px;
+    font-size: 1.05rem;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(4px);
   }
 
   .banner-nav.prev {
-    left: 8px;
+    left: 6px;
   }
 
   .banner-nav.next {
-    right: 8px;
+    right: 6px;
   }
 
   .banner-dots {
-    bottom: 10px;
+    bottom: 8px;
   }
 
   .hero-section {
@@ -2273,34 +2306,36 @@ a {
   }
 
   .banner-slide {
-    padding: 16px 46px 32px;
+    padding: 12px 42px 30px;
     gap: 10px;
   }
 
   .banner-slide .banner-icon-shell {
-    width: 80px;
-    height: 80px;
-    border-radius: 18px;
+    width: 58px;
+    height: 58px;
+    border-radius: 14px;
   }
 
   .banner-icon-shell img,
   .banner-icon-shell span {
-    font-size: 2.2rem;
+    font-size: 1.7rem;
   }
 
   .banner-title {
-    font-size: 1.25rem;
+    font-size: 0.98rem;
   }
 
-  .banner-desc {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+  .banner-meta {
+    font-size: 0.7rem;
+  }
+
+  .banner-actions {
+    gap: 6px;
   }
 
   .banner-actions .btn {
-    flex: 1;
+    padding: 6px 11px;
+    font-size: 0.76rem;
   }
 
   .section-header {
@@ -2351,6 +2386,53 @@ a {
 @media (max-width: 420px) {
   .hero-title {
     font-size: 1.15rem;
+  }
+
+  .banner-slide {
+    padding: 10px 38px 28px;
+    gap: 8px;
+  }
+
+  .banner-slide .banner-icon-shell {
+    width: 52px;
+    height: 52px;
+    border-radius: 13px;
+  }
+
+  .banner-icon-shell img,
+  .banner-icon-shell span {
+    font-size: 1.5rem;
+  }
+
+  .banner-title {
+    font-size: 0.92rem;
+  }
+
+  .banner-meta {
+    font-size: 0.68rem;
+  }
+
+  .banner-meta span + span::before {
+    margin: 0 5px;
+  }
+
+  .banner-actions .btn {
+    padding: 5px 10px;
+    font-size: 0.72rem;
+  }
+
+  .banner-nav {
+    width: 28px;
+    height: 28px;
+    font-size: 0.95rem;
+  }
+
+  .banner-nav.prev {
+    left: 4px;
+  }
+
+  .banner-nav.next {
+    right: 4px;
   }
 
   .featured-grid {
