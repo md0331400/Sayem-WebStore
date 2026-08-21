@@ -448,14 +448,11 @@
   <div class="side-menu-footer" id="sideFooter"></div>
 </aside>
 
-<!-- ============ APP DETAIL MODAL ============ -->
-<div class="overlay hidden" id="appDetailOverlay" onclick="closeAppDetail(event)">
-  <div class="modal modal-wide">
-    <div class="modal-header">
-      <h3 class="modal-title">App Details</h3>
-      <button class="close-btn" onclick="closeModal('appDetailOverlay')">✕</button>
-    </div>
-    <div id="appDetailContent"></div>
+<!-- ============ APP DETAIL PAGE ============ -->
+<div id="appDetailPage" class="page">
+  <div class="container page-container app-detail-page">
+    <button class="btn btn-ghost btn-sm" onclick="closeAppDetailPage()">← Back</button>
+    <div id="appDetailPageContent"></div>
   </div>
 </div>
 

@@ -288,7 +288,10 @@ function registerServiceWorker() {
   });
 }
 
+let lastPageId = "homePage";
+
 function showPage(id) {
+  if (id !== "appDetailPage") lastPageId = id;
   document.querySelectorAll(".page").forEach((page) => page.classList.remove("active"));
   const page = $(id);
   if (page) page.classList.add("active");
@@ -303,6 +306,11 @@ function showPage(id) {
   }
 }
 window.showPage = showPage;
+
+function closeAppDetailPage() {
+  showPage(lastPageId || "homePage");
+}
+window.closeAppDetailPage = closeAppDetailPage;
 
 function goHome() {
   showPage("homePage");
@@ -1066,7 +1074,7 @@ function appRowHtml(app) {
     <article class="app-card" onclick='openAppDetail(${toJsString(app.key)})'>
       <div class="app-card-head">
         ${getCardIconHtml(app)}
-        <div>
+        <div class="app-card-titles">
           <h3 class="app-name">${escapeHtml(app.name)}</h3>
           <div class="app-category">${escapeHtml(app.category || "App")}</div>
         </div>
@@ -1076,6 +1084,7 @@ function appRowHtml(app) {
         <span>${formatNum(app.downloads || 0)} downloads</span>
       </div>
       <p class="app-desc-snippet">${escapeHtml((app.description || "No description available.").slice(0, 110))}${(app.description || "").length > 110 ? "…" : ""}</p>
+      <span class="app-download-btn">Download</span>
     </article>
   `;
 }
@@ -1285,7 +1294,7 @@ function openAppDetail(key) {
     .map((v) => `<span class="star ${userExistingRating >= v ? "active" : ""}" onclick='setRating(${v})'>★</span>`)
     .join("");
 
-  const content = $("appDetailContent");
+  const content = $("appDetailPageContent");
   if (!content) return;
 
   content.innerHTML = `
@@ -1331,7 +1340,7 @@ function openAppDetail(key) {
     </div>
   `;
 
-  $("appDetailOverlay")?.classList.remove("hidden");
+  showPage("appDetailPage");
 }
 window.openAppDetail = openAppDetail;
 
@@ -1413,7 +1422,6 @@ window.submitReview = submitReview;
 
 async function downloadApp(key, link) {
   if (!currentUser) {
-    closeModal("appDetailOverlay");
     showPage("authPage");
     toast("Please login to download!", "error");
     return;
@@ -1437,11 +1445,6 @@ function closeModal(id) {
   $(id)?.classList.add("hidden");
 }
 window.closeModal = closeModal;
-
-function closeAppDetail(e) {
-  if (e && e.target === $("appDetailOverlay")) closeModal("appDetailOverlay");
-}
-window.closeAppDetail = closeAppDetail;
 
 function openReport() {
   $("reportOverlay")?.classList.remove("hidden");
@@ -1581,7 +1584,6 @@ function setupGlobalEvents() {
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     closeMenu();
-    closeModal("appDetailOverlay");
     closeModal("reportOverlay");
     closeModal("aboutOverlay");
     document.querySelectorAll(".screenshot-lightbox").forEach((el) => el.remove());

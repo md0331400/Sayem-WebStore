@@ -905,48 +905,43 @@ a {
   font-size: 0.76rem;
 }
 
-/* ---------- All apps list (store style rows) ---------- */
+/* ---------- All apps grid (box cards) ---------- */
 .apps-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
 }
 
 .app-card {
   position: relative;
   overflow: hidden;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--card);
   box-shadow: var(--shadow-sm);
-  padding: 10px 14px;
+  padding: 14px;
   cursor: pointer;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  grid-template-areas:
-    "icon info action"
-    "icon meta action";
-  column-gap: 12px;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .app-card:hover {
+  transform: translateY(-2px);
   border-color: rgba(255, 138, 36, 0.5);
   box-shadow: var(--shadow);
 }
 
 .app-card-head {
-  display: contents;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.app-card-head .app-icon-shell {
-  grid-area: icon;
-}
-
-.app-card-head > div:last-child {
-  grid-area: info;
+.app-card-titles {
   min-width: 0;
+  flex: 1;
 }
 
 .app-name {
@@ -955,21 +950,20 @@ a {
   text-overflow: ellipsis;
 }
 
-.app-rating {
-  grid-area: meta;
-  margin-top: 2px;
-}
-
 .app-desc-snippet {
-  display: none;
+  flex: 1;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-/* Row action button (fake, whole row opens details) */
-.app-card::after {
-  content: "Download";
-  grid-area: action;
-  align-self: center;
-  padding: 7px 14px;
+.app-download-btn {
+  align-self: flex-start;
+  padding: 7px 16px;
   border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 700;
@@ -1308,14 +1302,14 @@ a {
 .side-menu {
   position: fixed;
   top: 0;
-  right: 0;
+  left: 0;
   width: min(88vw, 300px);
   height: 100vh;
   height: 100dvh;
   padding-top: max(env(safe-area-inset-top), 0px);
   background: var(--card);
-  border-left: 1px solid var(--border);
-  transform: translateX(100%);
+  border-right: 1px solid var(--border);
+  transform: translateX(-100%);
   transition: transform 0.32s ease;
   z-index: 73;
   display: flex;
@@ -1476,6 +1470,23 @@ a {
 
 .close-btn:hover {
   background: var(--chip-bg);
+}
+
+/* ---------- App detail page ---------- */
+.app-detail-page {
+  padding: 14px 0 44px;
+}
+
+.app-detail-page > .btn {
+  margin-bottom: 14px;
+}
+
+.app-detail-page .app-detail-layout {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 18px;
 }
 
 /* ---------- App detail ---------- */
@@ -2259,7 +2270,8 @@ a {
     font-size: 0.76rem;
   }
 
-  .featured-grid {
+  .featured-grid,
+  .apps-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
@@ -2288,8 +2300,7 @@ a {
   }
 
   .app-card {
-    padding: 9px 11px;
-    column-gap: 10px;
+    padding: 11px;
   }
 
   .app-icon-shell {
@@ -2315,8 +2326,8 @@ a {
     gap: 6px;
   }
 
-  .app-card::after {
-    padding: 6px 11px;
+  .app-download-btn {
+    padding: 6px 12px;
     font-size: 0.74rem;
   }
 
@@ -2494,9 +2505,8 @@ a {
     grid-template-columns: 1fr;
   }
 
-  .app-card::after {
-    content: "Get";
-    padding: 6px 10px;
+  .app-detail-page .app-detail-layout {
+    padding: 14px;
   }
 
   .screenshot-thumb {
@@ -2594,23 +2604,13 @@ a {
   }
 
   .app-card {
-    padding: 8px 10px;
-    column-gap: 8px;
+    padding: 10px;
   }
 
   .app-icon-shell {
     width: 36px;
     height: 36px;
     border-radius: 9px;
-  }
-
-  .app-card::after {
-    padding: 5px 8px;
-    font-size: 0.7rem;
-  }
-
-  .app-rating span:last-child {
-    display: none;
   }
 
   .auth-panel,
