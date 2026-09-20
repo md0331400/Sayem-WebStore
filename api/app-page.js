@@ -19,10 +19,50 @@ const FIREBASE_DB_BASE =
   process.env.FIREBASE_DATABASE_URL ||
   "https://samva-app-store-default-rtdb.asia-southeast1.firebasedatabase.app";
 
+// Deployment-scoped URLs (VERCEL_URL) can sit behind Vercel Deployment
+// Protection (SSO), which would return a login page instead of the shell.
+// The public production URL is the reliable source; SHELL_BASE_URL overrides
+// everything for local testing.
+const SHELL_MARKER = 'id="appDetailPageContent"';
+const NOTFOUND_MARKER = "<title>404";
+
 function shellBase() {
   if (process.env.SHELL_BASE_URL) return process.env.SHELL_BASE_URL.replace(/\/$/, "");
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return PROD_ORIGIN;
+}
+
+/** Minimal self-contained SSR document — used if the deployed shell cannot be
+ *  fetched/validated, so crawlers always receive full SEO signals + content. */
+function standaloneSsrPage({ vm, siteName, ogImage, ogTitle, jsonLd, inner }) {
+  const e = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${e(vm.title)}</title>
+<meta name="description" content="${e(vm.metaDescription)}">
+<link rel="canonical" href="${e(vm.url)}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="${e(siteName)}">
+<meta property="og:title" content="${e(ogTitle)}">
+<meta property="og:description" content="${e(vm.metaDescription)}">
+<meta property="og:url" content="${e(vm.url)}">
+<meta property="og:image" content="${e(ogImage)}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${e(ogTitle)}">
+<meta name="twitter:description" content="${e(vm.metaDescription)}">
+<meta name="twitter:image" content="${e(ogImage)}">
+<script type="application/ld+json" id="pageJsonLd">${JSON.stringify(jsonLd)}</script>
+</head>
+<body>
+<main id="appDetailPage" class="page active">
+  <div id="appDetailPageContent">${inner}</div>
+</main>
+</body>
+</html>`;
 }
 
 async function fetchText(url, timeoutMs = 8000) {
@@ -97,7 +137,7 @@ function injectMeta(html, { title, description, canonical, ogImage, ogTitle, ogD
 const SIMPLE_404 = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, follow">
-<title>Not Found | Sayem WebStore</title></head>
+<title>404 — Not Found | Sayem WebStore</title></head>
 <body style="font-family:system-ui,sans-serif;text-align:center;padding:48px 20px;">
 <h1>😕 Not found</h1>
 <p>That page does not exist on Sayem WebStore.</p>
@@ -118,16 +158,24 @@ module.exports = async function handler(req, res) {
   }
 
   const base = shellBase();
-  const [shellHtml, appsData, siteNameData] = await Promise.all([
+  const [shellHtmlRaw, appsData, siteNameData] = await Promise.all([
     fetchText(`${base}/index.html`),
     fetchJson(`${FIREBASE_DB_BASE}/apps.json`),
     fetchJson(`${FIREBASE_DB_BASE}/settings/websiteName.json`),
   ]);
 
-  // Could not read the deployed shell → nothing safe to render.
-  if (!shellHtml) {
+  // Validate the shell: an unvalidated document (e.g. a Deployment Protection
+  // login page) must never receive injected meta or be served as an app page.
+  let shellHtml = shellHtmlRaw && shellHtmlRaw.includes(SHELL_MARKER) ? shellHtmlRaw : null;
+  if (!shellHtml && base !== PROD_ORIGIN) {
+    const retry = await fetchText(`${PROD_ORIGIN}/index.html`);
+    if (retry && retry.includes(SHELL_MARKER)) shellHtml = retry;
+  }
+
+  // No usable shell AND no catalog → nothing safe to render.
+  if (!shellHtml && !appsData) {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.status(500).send(SIMPLE_404.replace("<title>Not Found | Sayem WebStore</title>", "<title>Temporarily unavailable | Sayem WebStore</title>").replace("😕 Not found", "😕 Temporarily unavailable"));
+    res.status(500).send(SIMPLE_404.replace("<title>404 — Not Found | Sayem WebStore</title>", "<title>Temporarily unavailable | Sayem WebStore</title>").replace("😕 Not found", "😕 Temporarily unavailable"));
     return;
   }
 
@@ -136,7 +184,7 @@ module.exports = async function handler(req, res) {
     utils = await import("../seo-utils.js");
   } catch {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.status(200).send(shellHtml); // graceful: behave like the plain static shell
+    res.status(200).send(shellHtml || SIMPLE_404.replace("<title>404 — Not Found | Sayem WebStore</title>", "<title>Temporarily unavailable | Sayem WebStore</title>"));
     return;
   }
 
@@ -154,9 +202,12 @@ module.exports = async function handler(req, res) {
 
   // ---- Unknown slug → real 404 (never show an unrelated app) ----
   if (!app) {
-    const notFoundHtml = (await fetchText(`${base}/404.html`)) || SIMPLE_404;
+    let notFoundHtml = await fetchText(`${base}/404.html`);
+    if (!notFoundHtml || !notFoundHtml.includes(NOTFOUND_MARKER)) {
+      notFoundHtml = base === PROD_ORIGIN ? null : await fetchText(`${PROD_ORIGIN}/404.html`);
+    }
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.status(404).send(notFoundHtml);
+    res.status(404).send(notFoundHtml && notFoundHtml.includes(NOTFOUND_MARKER) ? notFoundHtml : SIMPLE_404);
     return;
   }
 
@@ -179,29 +230,31 @@ module.exports = async function handler(req, res) {
     installedVersionCode: null,
   });
 
-  let html = shellHtml;
-
-  // Activate the detail page, deactivate the home page (visible content for non-JS crawlers)
-  html = replaceOnce(html, /<main id="homePage" class="page active">/, '<main id="homePage" class="page">');
-  html = replaceOnce(html, /<div id="appDetailPage" class="page">/, '<div id="appDetailPage" class="page active">');
-  html = replaceOnce(
-    html,
-    /<div id="appDetailPageContent"><\/div>/,
-    `<div id="appDetailPageContent">${utils.renderAppDetailInner(vm)}</div>`
-  );
-
   const ogImage =
     app.imageUrl && String(app.imageUrl).startsWith("http") ? String(app.imageUrl) : `${PROD_ORIGIN}/icons/icon-512.png`;
+  const ogTitle = `${app.name || vm.typeLabel} — ${vm.typeLabel} Download | ${siteName}`;
+  const jsonLd = utils.appJsonLd(vm);
+  const inner = utils.renderAppDetailInner(vm);
 
-  html = injectMeta(html, {
-    title: vm.title,
-    description: vm.metaDescription,
-    canonical: vm.url,
-    ogImage,
-    ogTitle: `${app.name || vm.typeLabel} — ${vm.typeLabel} Download | ${siteName}`,
-    ogDescription: vm.metaDescription,
-    jsonLdJson: utils.appJsonLd(vm),
-  });
+  let html;
+  if (shellHtml) {
+    html = shellHtml;
+    // Activate the detail page, deactivate the home page (visible content for non-JS crawlers)
+    html = replaceOnce(html, /<main id="homePage" class="page active">/, '<main id="homePage" class="page">');
+    html = replaceOnce(html, /<div id="appDetailPage" class="page">/, '<div id="appDetailPage" class="page active">');
+    html = replaceOnce(html, /<div id="appDetailPageContent"><\/div>/, `<div id="appDetailPageContent">${inner}</div>`);
+    html = injectMeta(html, {
+      title: vm.title,
+      description: vm.metaDescription,
+      canonical: vm.url,
+      ogImage,
+      ogTitle,
+      ogDescription: vm.metaDescription,
+      jsonLdJson: jsonLd,
+    });
+  } else {
+    html = standaloneSsrPage({ vm, siteName, ogImage, ogTitle, jsonLd, inner });
+  }
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.status(200).send(html);
