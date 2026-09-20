@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, follow">
+<title>Page Not Found | Sayem WebStore</title>
+<meta name="description" content="That page does not exist on Sayem WebStore. Browse free apps and games instead.">
+<link rel="canonical" href="https://sayemwebstore.vercel.app/">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<meta name="theme-color" content="#ffffff">
+<style>
+  :root { color-scheme: light dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background: #f4f5f7;
+    color: #1b1d22;
+    padding: 24px;
+  }
+  .card {
+    max-width: 460px;
+    width: 100%;
+    background: #fff;
+    border: 1px solid #e5e7ec;
+    border-radius: 20px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.08);
+    padding: 36px 28px;
+    text-align: center;
+  }
+  .logo { width: 64px; height: 64px; border-radius: 16px; margin-bottom: 16px; }
+  .code { font-size: 3rem; font-weight: 800; color: #ff8a24; line-height: 1; }
+  h1 { font-size: 1.25rem; margin: 10px 0 8px; }
+  p { color: #5f6368; font-size: .92rem; line-height: 1.6; margin-bottom: 20px; }
+  .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  a.btn {
+    display: inline-block;
+    padding: 10px 18px;
+    border-radius: 12px;
+    font-size: .88rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  a.primary { background: linear-gradient(120deg, #ff8a24, #ffb347); color: #1b1d22; }
+  a.ghost { background: #f1f3f5; color: #1b1d22; border: 1px solid #e5e7ec; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #0b0d12; color: #e8eaee; }
+    .card { background: #161a23; border-color: rgba(255,255,255,.09); }
+    p { color: #9aa0aa; }
+    a.ghost { background: #1c2130; color: #e8eaee; border-color: rgba(255,255,255,.12); }
+  }
+</style>
+</head>
+<body>
+  <main class="card">
+    <img class="logo" src="/icons/icon-192.png" alt="Sayem WebStore logo" width="64" height="64">
+    <div class="code">404</div>
+    <h1>Page not found</h1>
+    <p>The page you are looking for does not exist on Sayem WebStore. Explore the catalog — apps and games download free, no login needed.</p>
+    <div class="actions">
+      <a class="btn primary" href="/">🏠 Home</a>
+      <a class="btn ghost" href="/apps">📱 Apps</a>
+      <a class="btn ghost" href="/games">🎮 Games</a>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    },
+    {
+      "source": "/icons/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }]
+    }
+  ],
+  "rewrites": [
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+
+    {
+      "source": "/app/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|crawl|spider|slurp|facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|linkedinbot|slackbot|discordbot|redditbot|embedly|outbrain|pinterest|applebot|vkshare|w3c_validator|google-inspectiontool|googleother|bingpreview|iframely|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot|petalbot|naver|exabot|ia_archiver|linkpreview|flipboard|qwantify|unfurl|preview).*"
+        }
+      ],
+      "destination": "/api/app-page?type=app&slug=:slug"
+    },
+    {
+      "source": "/game/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|crawl|spider|slurp|facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|linkedinbot|slackbot|discordbot|redditbot|embedly|outbrain|pinterest|applebot|vkshare|w3c_validator|google-inspectiontool|googleother|bingpreview|iframely|seznambot|ahrefsbot|semrushbot|mj12bot|dotbot|petalbot|naver|exabot|ia_archiver|linkpreview|flipboard|qwantify|unfurl|preview).*"
+        }
+      ],
+      "destination": "/api/app-page?type=game&slug=:slug"
+    },
+
+    { "source": "/app/:slug", "destination": "/index.html" },
+    { "source": "/game/:slug", "destination": "/index.html" },
+    { "source": "/apps", "destination": "/index.html" },
+    { "source": "/games", "destination": "/index.html" },
+    { "source": "/search", "destination": "/index.html" },
+    { "source": "/faq", "destination": "/index.html" },
+    { "source": "/terms", "destination": "/index.html" },
+    { "source": "/privacy", "destination": "/index.html" },
+    { "source": "/disclaimer", "destination": "/index.html" }
+  ]
+}

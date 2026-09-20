@@ -3,39 +3,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>SamWeb Store — Free Apps &amp; Games Download Platform</title>
-<meta name="description" content="SamWeb Store is a free platform to discover, review and download the best apps and games. Browse trending apps, read real user reviews and download in one tap.">
-<meta name="keywords" content="SamWeb Store, app store, apps download, games download, free apps, android apps, apk, apps and games">
+<title>Sayem WebStore — Free Apps &amp; Games Download</title>
+<meta name="description" content="Sayem WebStore is a free platform to discover, review and download apps and games for Android. Browse the catalog, read real user reviews and download in one tap — no login needed.">
 <meta name="author" content="Md. Abu Sayem (amisayem)">
 <meta name="robots" content="index, follow">
 <meta name="theme-color" content="#ffffff">
-<link rel="canonical" href="https://samva-app-store.firebaseapp.com/">
+<link rel="canonical" href="https://sayemwebstore.vercel.app/">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="SamWeb Store">
-<meta property="og:title" content="SamWeb Store — Free Apps &amp; Games Download Platform">
-<meta property="og:description" content="Discover, review and download the best apps and games — all in one place. Free, fast and secure.">
-<meta property="og:url" content="https://samva-app-store.firebaseapp.com/">
-<meta property="og:image" content="https://samva-app-store.firebaseapp.com/icons/icon-512.png">
+<meta property="og:site_name" content="Sayem WebStore">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Sayem WebStore — Free Apps &amp; Games Download">
+<meta property="og:description" content="Discover, review and download free apps and games for Android — real user reviews, screenshots and one-tap downloads. No login needed.">
+<meta property="og:url" content="https://sayemwebstore.vercel.app/">
+<meta property="og:image" content="https://sayemwebstore.vercel.app/icons/icon-512.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="SamWeb Store — Free Apps &amp; Games Download Platform">
-<meta name="twitter:description" content="Discover, review and download the best apps and games — all in one place.">
-<meta name="twitter:image" content="https://samva-app-store.firebaseapp.com/icons/icon-512.png">
-<script type="application/ld+json">
+<meta name="twitter:title" content="Sayem WebStore — Free Apps &amp; Games Download">
+<meta name="twitter:description" content="Discover, review and download free apps and games for Android — no login needed.">
+<meta name="twitter:image" content="https://sayemwebstore.vercel.app/icons/icon-512.png">
+<script type="application/ld+json" id="pageJsonLd">
 {
   "@context": "https://schema.org",
   "@graph": [
     {
       "@type": "WebSite",
-      "name": "SamWeb Store",
-      "url": "https://samva-app-store.firebaseapp.com/",
-      "description": "Free apps and games download platform — discover, review and download the best apps and games.",
-      "inLanguage": "en"
+      "@id": "https://sayemwebstore.vercel.app/#website",
+      "name": "Sayem WebStore",
+      "url": "https://sayemwebstore.vercel.app/",
+      "description": "Free apps and games download platform — discover, review and download apps and games for Android.",
+      "inLanguage": "en",
+      "publisher": { "@id": "https://sayemwebstore.vercel.app/#organization" },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": { "@type": "EntryPoint", "urlTemplate": "https://sayemwebstore.vercel.app/search?q={search_term_string}" },
+        "query-input": "required name=search_term_string"
+      }
     },
     {
       "@type": "Organization",
-      "name": "SamWeb Store",
-      "url": "https://samva-app-store.firebaseapp.com/",
-      "logo": "https://samva-app-store.firebaseapp.com/icons/icon-512.png",
+      "@id": "https://sayemwebstore.vercel.app/#organization",
+      "name": "Sayem WebStore",
+      "url": "https://sayemwebstore.vercel.app/",
+      "logo": "https://sayemwebstore.vercel.app/icons/icon-512.png",
       "email": "abusayem0866@gmail.com",
       "address": { "@type": "PostalAddress", "addressCountry": "BD" },
       "founder": { "@type": "Person", "name": "Md. Abu Sayem" }
@@ -51,25 +61,26 @@
     }
   } catch (e) {}
 </script>
-<link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/style.css">
 </head>
 <body>
+<a class="skip-link" href="#homePage">Skip to content</a>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <!-- Online / offline status pill -->
 <div class="status-dock">
-  <div class="network-pill online" id="networkPill">Online • synced</div>
+  <div class="network-pill online hidden" id="networkPill">Online • synced</div>
 </div>
 
 <!-- PWA install banner -->
 <div class="install-banner hidden" id="installBanner">
   <div class="install-banner-copy">
-    <strong>SamWeb Store</strong>
+    <strong>Sayem WebStore</strong>
     <span id="installBannerText">Install this PWA for an app-like experience with cached offline access.</span>
   </div>
   <div class="install-banner-actions">
@@ -85,13 +96,13 @@
       <div class="menu-btn" onclick="openMenu()" aria-label="Open menu"><span></span><span></span><span></span></div>
     </div>
 
-    <div class="brand" onclick="goHome()" role="link" tabindex="0" aria-label="SamWeb Store home">
+    <div class="brand" onclick="goHome()" role="link" tabindex="0" aria-label="Sayem WebStore home">
       <div class="brand-mark">
-        <img id="headerLogoImg" src="icons/icon-192.png" alt="SamWeb Store logo" style="display:none;">
+        <img id="headerLogoImg" src="/icons/icon-192.png" alt="Sayem WebStore logo" width="36" height="36" style="display:none;">
         <div class="brand-emoji" id="headerLogoEmoji">🛒</div>
       </div>
       <div class="brand-copy">
-        <div class="brand-title" id="websiteName">SamWeb Store</div>
+        <div class="brand-title" id="websiteName">Sayem WebStore</div>
         <div class="brand-subtitle">Apps &amp; Games Store</div>
       </div>
     </div>
@@ -122,7 +133,7 @@
   <section class="hero-section">
     <div class="container">
       <h1 class="hero-title">Discover Apps &amp; Games You'll Love</h1>
-      <p class="hero-sub">Free apps &amp; games — browse, review and download in one tap.</p>
+      <p class="hero-sub">Free apps &amp; games — browse, review and download in one tap. No login needed to download.</p>
       <div class="metric-grid">
         <div class="metric-card"><strong id="heroAppsCount">0</strong><span>Apps</span></div>
         <div class="metric-card"><strong id="heroDownloadsCount">0</strong><span>Downloads</span></div>
@@ -169,6 +180,17 @@
     </div>
   </section>
 
+  <!-- LATEST ADDITIONS -->
+  <section class="content-section hidden" id="latestSection">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Latest Additions</h2>
+        <a class="section-meta section-link" href="/apps" data-nav>See all apps →</a>
+      </div>
+      <div class="apps-grid" id="latestGrid"></div>
+    </div>
+  </section>
+
   <!-- AD SLOT: home middle -->
   <div class="container"><div class="ad-slot hidden" data-ad-slot="home_mid"></div></div>
 
@@ -193,9 +215,9 @@
       <div class="footer-grid">
         <div>
           <div class="footer-brand">
-            <img src="icons/icon-192.png" alt="SamWeb Store logo">
+            <img src="/icons/icon-192.png" alt="Sayem WebStore logo">
             <div>
-              <strong id="footerBrandName">SamWeb Store</strong>
+              <strong id="footerBrandName">Sayem WebStore</strong>
               <span>Apps &amp; Games Download Platform</span>
             </div>
           </div>
@@ -203,18 +225,26 @@
         </div>
         <div class="footer-links">
           <h3>Quick Links</h3>
-          <button class="footer-link" onclick="navigateToSection('homePage')">Home</button>
-          <button class="footer-link" onclick="navigateToSection('featuredSection')">Featured</button>
-          <button class="footer-link" onclick="navigateToSection('appsSection')">All Apps</button>
+          <a class="footer-link" href="/" data-nav>Home</a>
+          <a class="footer-link" href="/apps" data-nav>Apps</a>
+          <a class="footer-link" href="/games" data-nav>Games</a>
+          <a class="footer-link" href="/search" data-nav>Search</a>
         </div>
         <div class="footer-links">
           <h3>Support</h3>
+          <a class="footer-link" href="/faq" data-nav>FAQ</a>
           <button class="footer-link" onclick="openReport()">Report Us</button>
           <button class="footer-link" onclick="openAbout()">About</button>
           <button class="footer-link" id="installBtn" onclick="triggerInstallPrompt()">Install App</button>
         </div>
+        <div class="footer-links">
+          <h3>Legal</h3>
+          <a class="footer-link" href="/terms" data-nav>Terms of Use</a>
+          <a class="footer-link" href="/privacy" data-nav>Privacy Policy</a>
+          <a class="footer-link" href="/disclaimer" data-nav>Disclaimer</a>
+        </div>
       </div>
-      <p class="footer-note" style="text-align:center;margin-top:14px;">© 2026 SamWeb Store. All rights reserved.</p>
+      <p class="footer-note" style="text-align:center;margin-top:14px;">© 2026 Sayem WebStore. All rights reserved.</p>
     </div>
   </footer>
 </main>
@@ -245,9 +275,10 @@
 <div id="gamesPage" class="page">
   <div class="container page-container">
     <div class="section-header section-header-wrap">
-      <h2 class="section-title">🎮 Games</h2>
+      <h1 class="section-title">🎮 Games</h1>
       <span class="section-meta" id="gamesCount"></span>
     </div>
+    <div class="category-filters" id="gamesCategoryFilters"></div>
     <div class="ad-slot hidden" data-ad-slot="games_top"></div>
     <div class="apps-grid" id="gamesGrid"></div>
   </div>
@@ -257,9 +288,10 @@
 <div id="appsPage" class="page">
   <div class="container page-container">
     <div class="section-header section-header-wrap">
-      <h2 class="section-title">📱 Apps</h2>
+      <h1 class="section-title">📱 Apps</h1>
       <span class="section-meta" id="appsPageCount"></span>
     </div>
+    <div class="category-filters" id="appsCategoryFilters"></div>
     <div class="ad-slot hidden" data-ad-slot="apps_top"></div>
     <div class="apps-grid" id="appsPageGrid"></div>
   </div>
@@ -272,15 +304,15 @@
     <div class="page-content">
       <div class="faq-item">
         <div class="faq-q">How do I download an app or game?</div>
-        <div class="faq-a">Tap the Download button on any app row or on the featured banner. You need to be logged in — after that the download starts and the download count updates automatically.</div>
+        <div class="faq-a">Tap the Download button on any app card, the featured banner or an app page. No login is needed — the download starts right away and the download count updates automatically.</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">Is SamWeb Store free?</div>
-        <div class="faq-a">Yes. Browsing, downloading, and reviewing apps on SamWeb Store is completely free.</div>
+        <div class="faq-q">Is Sayem WebStore free?</div>
+        <div class="faq-a">Yes. Browsing and downloading apps on Sayem WebStore is completely free.</div>
       </div>
       <div class="faq-item">
         <div class="faq-q">Do I need an account?</div>
-        <div class="faq-a">You can browse freely, but an account is required to download apps and to submit ratings and reviews.</div>
+        <div class="faq-a">No. You can browse and download every app and game as a guest. A free account is only needed to submit ratings and reviews, report problems, and use account-only features.</div>
       </div>
       <div class="faq-item">
         <div class="faq-q">How do I rate or review an app?</div>
@@ -303,11 +335,11 @@
   <div class="container page-container">
     <h1 class="page-title">Disclaimer</h1>
     <div class="page-content">
-      <p>SamWeb Store is an independent apps and games discovery platform. We are not affiliated with, endorsed by, or sponsored by Google Play, the Android brand, or any app developer or publisher listed on this website.</p>
+      <p>Sayem WebStore is an independent apps and games discovery platform. We are not affiliated with, endorsed by, or sponsored by Google Play, the Android brand, or any app developer or publisher listed on this website.</p>
       <h2>App Listings</h2>
       <p>All app names, logos, icons, screenshots, and trademarks displayed on this website belong to their respective owners and are used only to identify and describe the products. Listing an app does not imply any partnership with its developer.</p>
       <h2>Downloads</h2>
-      <p>Downloads may be hosted by third-party servers. SamWeb Store does not guarantee the availability, safety, or functionality of any file. Users download and install apps at their own risk and should always verify the source and requested permissions.</p>
+      <p>Downloads may be hosted by third-party servers. Sayem WebStore does not guarantee the availability, safety, or functionality of any file. Users download and install apps at their own risk and should always verify the source and requested permissions.</p>
       <h2>Content Accuracy</h2>
       <p>We try to keep all information accurate and up to date, but we make no warranties about completeness, reliability, or accuracy of any content on this website.</p>
       <h2>Copyright</h2>
@@ -321,7 +353,7 @@
   <div class="container page-container">
     <h1 class="page-title">Terms of Use</h1>
     <div class="page-content">
-      <p>By accessing or using SamWeb Store, you agree to these Terms of Use. If you do not agree, please do not use the website.</p>
+      <p>By accessing or using Sayem WebStore, you agree to these Terms of Use. If you do not agree, please do not use the website.</p>
       <h2>Accounts</h2>
       <p>When you create an account you must provide accurate information and keep your password safe. You are responsible for all activity that happens under your account.</p>
       <h2>Acceptable Use</h2>
@@ -345,7 +377,7 @@
   <div class="container page-container">
     <h1 class="page-title">Privacy Policy</h1>
     <div class="page-content">
-      <p>Your privacy matters to us. This policy explains what data SamWeb Store collects and how it is used.</p>
+      <p>Your privacy matters to us. This policy explains what data Sayem WebStore collects and how it is used.</p>
       <h2>Information We Collect</h2>
       <ul>
         <li><strong>Account data:</strong> name, email address, phone number, and gender when you sign up.</li>
@@ -372,10 +404,10 @@
         <div class="auth-panel-copy">
           <div class="eyebrow">👋 Join the community</div>
           <h2>One account.<br>Every app you love.</h2>
-          <p>Sign in to download, review, and keep your favorite apps in reach across devices.</p>
+          <p>Browse and download freely — no account needed. Sign in to review, rate, report issues and keep your favorite apps in reach across devices.</p>
         </div>
         <div class="auth-benefits">
-          <div class="auth-benefit"><span>⚡</span><p>Instant downloads with one tap</p></div>
+          <div class="auth-benefit"><span>⚡</span><p>Guest downloads — no login required</p></div>
           <div class="auth-benefit"><span>⭐</span><p>Rate apps and help the community</p></div>
           <div class="auth-benefit"><span>🔒</span><p>Your data stays private and secure</p></div>
         </div>
@@ -383,9 +415,9 @@
 
       <div class="auth-box">
         <div class="auth-logo">
-          <img id="authLogoImg" src="icons/icon-192.png" alt="SamWeb Store logo" style="display:none;">
+          <img id="authLogoImg" src="/icons/icon-192.png" alt="Sayem WebStore logo" style="display:none;">
           <div class="auth-logo-icon" id="authLogoIcon">🛒</div>
-          <div class="auth-logo-title">SamWeb Store</div>
+          <div class="auth-logo-title">Sayem WebStore</div>
         </div>
 
         <div class="auth-tabs">
@@ -432,6 +464,22 @@
             </div>
           </div>
           <div class="input-group">
+            <label for="signSource">How did you hear about Sayem WebStore? <span class="label-optional">(optional)</span></label>
+            <select id="signSource">
+              <option value="">Select an option…</option>
+              <option value="Google">Google</option>
+              <option value="Facebook">Facebook</option>
+              <option value="Instagram">Instagram</option>
+              <option value="TikTok">TikTok</option>
+              <option value="YouTube">YouTube</option>
+              <option value="Telegram">Telegram</option>
+              <option value="WhatsApp">WhatsApp</option>
+              <option value="Friend / Someone shared it">Friend / Someone shared it</option>
+              <option value="Another website">Another website</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="input-group">
             <label for="signPass">Password</label>
             <input type="password" id="signPass" placeholder="Create password (min 6 chars)">
           </div>
@@ -451,7 +499,7 @@
 <div class="side-overlay" id="sideOverlay" onclick="closeMenu()"></div>
 <aside class="side-menu" id="sideMenu">
   <div class="side-menu-header">
-    <div class="side-menu-logo">SamWeb Store</div>
+    <div class="side-menu-logo">Sayem WebStore</div>
     <button class="close-btn" onclick="closeMenu()">✕</button>
   </div>
   <nav class="side-menu-nav" id="sideNav"></nav>
@@ -488,30 +536,30 @@
       <button class="close-btn" onclick="closeModal('aboutOverlay')">✕</button>
     </div>
     <div class="about-top">
-      <img id="aboutLogoImg" src="icons/icon-192.png" alt="SamWeb Store logo" style="display:none;">
+      <img id="aboutLogoImg" src="/icons/icon-192.png" alt="Sayem WebStore logo" style="display:none;">
       <div class="about-avatar" id="aboutLogoEmoji">🛒</div>
       <div>
-        <h3>SamWeb Store</h3>
+        <h3>Sayem WebStore</h3>
         <p>Apps &amp; Games Download Platform</p>
       </div>
     </div>
     <div class="about-info-row"><div class="about-info-label">Creator</div><div class="about-info-value">Md. Abu Sayem (amisayem)</div></div>
     <div class="about-info-row"><div class="about-info-label">Address</div><div class="about-info-value">Bangladesh 🇧🇩</div></div>
     <div class="about-info-row"><div class="about-info-label">Email</div><div class="about-info-value">abusayem0866@gmail.com</div></div>
-    <div class="about-info-row"><div class="about-info-label">Version</div><div class="about-info-value"><span class="chip">v4.0.0</span></div></div>
-    <div class="about-box">SamWeb Store is a free platform to discover and download the best apps and games. Built with ❤️ in Bangladesh.</div>
+    <div class="about-info-row"><div class="about-info-label">Version</div><div class="about-info-value"><span class="chip">v4.1.0</span></div></div>
+    <div class="about-box">Sayem WebStore is a free platform to discover and download the best apps and games. Built with ❤️ in Bangladesh.</div>
   </div>
 </div>
 
 <noscript>
   <div style="padding:20px;font-family:sans-serif;font-size:15px;">
-    SamWeb Store is a free apps &amp; games download platform — discover, review and download the best apps and games in one place. Please enable JavaScript for the full experience.
+    Sayem WebStore is a free apps &amp; games download platform — discover, review and download the best apps and games in one place. Please enable JavaScript for the full experience.
   </div>
 </noscript>
 
 <!-- Floating ad slot (social bar / popup style scripts — managed from Admin Panel → Ads Manager) -->
 <div class="ad-slot-floating" data-ad-slot="floating" style="display:contents;"></div>
 
-<script type="module" src="app.js"></script>
+<script type="module" src="/app.js"></script>
 </body>
 </html>

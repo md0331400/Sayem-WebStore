@@ -1008,7 +1008,7 @@ a {
 
 .footer-grid {
   display: grid;
-  grid-template-columns: 1.2fr 0.7fr 0.8fr;
+  grid-template-columns: 1.3fr 0.7fr 0.8fr 0.8fr;
   gap: 18px;
   padding: 16px;
   border-radius: var(--radius-lg);
@@ -2678,4 +2678,219 @@ a {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ============================================================
+   v4.1 — Router pages, breadcrumbs, detail components, a11y
+   ============================================================ */
+
+/* Skip link (keyboard users) */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 200;
+  background: var(--card);
+  color: var(--text);
+  padding: 10px 16px;
+  border-radius: 0 0 10px 0;
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.skip-link:focus { left: 0; }
+
+/* Anchor-based cards/links keep the exact card look */
+a.app-card,
+a.featured-card {
+  color: inherit;
+  text-decoration: none;
+}
+a.footer-link {
+  text-decoration: none;
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  padding: 0;
+}
+a.section-link {
+  color: var(--primary-dark);
+  text-decoration: none;
+  font-weight: 600;
+}
+a.section-link:hover { text-decoration: underline; }
+
+/* Breadcrumbs */
+.breadcrumbs {
+  margin-bottom: 12px;
+  font-size: 0.8rem;
+}
+.breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  color: var(--text-dim);
+}
+.breadcrumbs li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.breadcrumbs li + li::before {
+  content: "›";
+  opacity: 0.6;
+}
+.breadcrumbs a {
+  color: var(--text-dim);
+  text-decoration: none;
+}
+.breadcrumbs a:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+.breadcrumbs li[aria-current="page"] span {
+  color: var(--text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 46vw;
+}
+
+/* App information table (version / package / updated) */
+.app-info-table {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 12px;
+  background: var(--soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.app-info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.8rem;
+}
+.app-info-row dt {
+  color: var(--text-soft);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.app-info-row dd {
+  margin: 0;
+  color: var(--text);
+  text-align: right;
+  word-break: break-all;
+}
+
+/* Update available banner (Android host / ?pkg=&vc=) */
+.update-banner {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(30, 158, 90, 0.4);
+  background: rgba(30, 158, 90, 0.08);
+  font-size: 0.84rem;
+  color: var(--text);
+}
+.update-banner span { color: var(--text-dim); }
+
+/* Login gate: reviews/ratings/reports need login — downloads never do */
+.login-gate-card {
+  padding: 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--soft);
+}
+.login-gate-card p {
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+  color: var(--text-dim);
+}
+.login-gate-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.login-gate-hint {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+}
+a[data-auth-nav] { text-decoration: none; }
+
+/* Not-found state for unknown /app/{slug} and /game/{slug} */
+.not-found-block {
+  text-align: center;
+  padding: 34px 16px;
+}
+.not-found-title {
+  font-size: 1.3rem;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+.not-found-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.detail-waiting {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 40px 0;
+  color: var(--text-dim);
+}
+
+/* Stars are real buttons now (keyboard accessible) */
+.star {
+  background: none;
+  border: none;
+  padding: 0 1px;
+  font-family: inherit;
+  line-height: 1;
+}
+
+/* Reviews / related spacing */
+.reviews-block { margin-top: 20px; }
+.related-section { margin-top: 6px; }
+
+/* Optional-field hint in forms */
+.label-optional {
+  font-weight: 400;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+}
+
+/* Detail heading column may not overflow the grid */
+.app-detail-heading { min-width: 0; }
+
+/* Visible keyboard focus everywhere */
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+.category-chip:focus-visible,
+.nav-item:focus-visible,
+.popular-chip:focus-visible,
+.star:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Small screens: keep breadcrumbs and info rows tidy */
+@media (max-width: 640px) {
+  .breadcrumbs li[aria-current="page"] span { max-width: 52vw; }
+  .app-info-row { font-size: 0.78rem; }
+  .not-found-actions .btn { flex: 1 1 auto; }
 }

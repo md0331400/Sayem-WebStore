@@ -1,13 +1,17 @@
-const STATIC_CACHE = 'samweb-static-v12';
-const RUNTIME_CACHE = 'samweb-runtime-v12';
+// Service worker — Sayem WebStore PWA
+// Cache version bumped for the v4.1 SEO/router release so every client
+// picks up the new shell, seo-utils.js and attribution.js immediately.
+const STATIC_CACHE = 'sayem-static-v13';
+const RUNTIME_CACHE = 'sayem-runtime-v13';
 const CORE_ASSETS = [
   './',
   './index.html',
+  './404.html',
   './style.css',
   './app.js',
+  './seo-utils.js',
+  './attribution.js',
   './manifest.json',
-  './robots.txt',
-  './sitemap.xml',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-192.png',
@@ -82,6 +86,10 @@ self.addEventListener('fetch', (event) => {
   // Admin panel must always come straight from the network —
   // never serve the storefront shell for /admin navigations.
   if (url.origin === self.location.origin && url.pathname.startsWith('/admin')) return;
+
+  // Sitemap is generated server-side from live Firebase data —
+  // never serve a stale cached copy to crawlers.
+  if (url.origin === self.location.origin && (url.pathname === '/sitemap.xml' || url.pathname.startsWith('/api/'))) return;
 
   event.respondWith((async () => {
     const staticCache = await caches.open(STATIC_CACHE);

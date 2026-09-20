@@ -1,4 +1,4 @@
-# SamWeb Store 🛒
+# Sayem WebStore 🛒
 
 Apps & Games ডাউনলোড প্ল্যাটফর্ম — Firebase Realtime Database + PWA (Progressive Web App) দিয়ে বানানো সম্পূর্ণ ওয়েবসাইট।
 
@@ -8,7 +8,7 @@ Apps & Games ডাউনলোড প্ল্যাটফর্ম — Firebas
 - 🔍 Live search + category filter
 - 🔐 Login / Sign Up (Firebase Realtime Database)
 - ⭐ App rating ও user review system
-- ⬇️ Download counter (login করা লাগবে)
+- ⬇️ Guest downloads + download counter (login ছাড়াই ডাউনলোড; রিভিউ/রেটিং/রিপোর্টের জন্য লগইন লাগবে)
 - 📱 PWA support — Install App button, offline mode, cached data
 - 📣 Report Us ফর্ম (report সরাসরি Firebase-এ যায়)
 - 👤 Visitor tracking (device token ভিত্তিক, duplicate হয় না)
@@ -104,3 +104,52 @@ Placements: `home_top`, `home_mid`, `home_bottom`, `games_top`, `apps_top`,
 ---
 
 Built with ❤️ in Bangladesh 🇧🇩
+
+---
+
+## v4.1 — Production upgrade (SEO, attribution, guest downloads, admin analytics)
+
+**Brand & SEO.** The site is "Sayem WebStore" everywhere (titles, OG/Twitter tags,
+JSON-LD, manifest, footer). Canonical domain is `https://sayemwebstore.vercel.app/`.
+Every app and game has its own crawlable URL (`/app/{slug}`, `/game/{slug}`) with a
+unique title, description, canonical, Open Graph/Twitter tags, visible content and
+`SoftwareApplication` + `WebPage` + `BreadcrumbList` structured data. Crawlers receive
+fully server-rendered pages via `api/app-page.js` (Vercel rewrite conditioned on
+bot user-agents) while humans get the instant client-rendered shell. Unknown slugs
+return a real 404 page (and `noindex`), never another app's content. `/sitemap.xml`
+is generated from the live Firebase catalog (`api/sitemap.js`) with honest `lastmod`
+values; `robots.txt` allows public assets and blocks `/admin`.
+
+**Guest downloads.** Downloading never requires an account. Login is required only
+for reviews, ratings and reports; all related copy (auth page, FAQ, gates) says so.
+
+**Versions & update checking.** Admin Add/Edit App now stores Version Name, Version
+Code and Package Name (fully backward compatible with old records). Detail pages
+accept `?pkg=<package>&vc=<versionCode>` and show an update banner when the website's
+`versionCode` is newer than the installed one.
+
+**Traffic attribution.** `attribution.js` captures first-touch and latest-touch
+acquisition (UTM parameters first, then external referrer classification, then
+Direct), survives 90 days in `localStorage`, is corruption-safe, strips UTM params
+from the visible URL, and never lets internal navigation overwrite sources. Signup
+asks "How did you hear about Sayem WebStore?" (preselected from detection, always
+user-changeable) and stores **both** the detected acquisition object
+(`firstTouch` / `latestTouch` / `signup` / `userSelectedSource`) and the user's own
+answer under `users/{key}/acquisition` — written once, never modified afterwards.
+Attribution failures can never block signup.
+
+**Admin analytics.** Users table gains Source / Campaign / Signup Date columns plus
+search + source + campaign filters. Each user has a detail view with the full
+acquisition record. A new **Traffic Sources** tab provides signup breakdowns by
+source, campaign and signup-question answer with date ranges (today / yesterday /
+7d / 30d / month / custom), and clicking a source drills into that source's users.
+A Campaign Link Generator builds and validates tracked URLs for the production
+domain. No per-pageview analytics writes are performed anywhere.
+
+**Security.** See `SECURITY.md` — including the documented plaintext-password issue
+(no destructive migration was performed) and `database.rules.proposed.json`, a
+ruleset to apply **after** migrating to Firebase Auth.
+
+**Tests.** `node tests/unit.test.mjs`, `node tests/functions.test.mjs`,
+`node tests/e2e.test.mjs` — see `tests/README.md`. Local dev server that mirrors the
+Vercel routing: `node tools/dev-server.mjs`.

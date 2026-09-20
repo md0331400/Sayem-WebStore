@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-  <title>SamWeb Store • Admin Panel</title>
+  <title>Sayem WebStore • Admin Panel</title>
   <meta name="robots" content="noindex, nofollow">
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
@@ -130,6 +130,40 @@
     .slot-stat { background: var(--card2); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 8px 12px; font-size: 11px; color: var(--text-dim); }
     .slot-stat b { display: block; font-size: 16px; color: var(--orange); }
     .note-box { background: var(--card2); border: 1px dashed var(--border); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+
+    /* ===== v4.1 — Users table, traffic sources, acquisition details ===== */
+    .user-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
+    .user-filters input[type=text] { flex:1 1 220px; background:var(--card2); border:1.5px solid var(--border); color:var(--text); padding:9px 12px; border-radius:8px; font-family:'Exo 2',sans-serif; font-size:13px; outline:none; min-width:0; }
+    .user-filters input[type=text]:focus { border-color:var(--orange); }
+    .user-filters select { background:var(--card2); border:1.5px solid var(--border); color:var(--text); padding:9px 10px; border-radius:8px; font-size:13px; outline:none; max-width:200px; font-family:'Exo 2',sans-serif; }
+    .user-filter-count { font-size:12px; color:var(--text-dim); width:100%; }
+    .user-row { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:12px; display:flex; align-items:center; gap:12px; margin-bottom:8px; flex-wrap:wrap; }
+    .user-row-main { flex:1; min-width:180px; }
+    .user-meta { font-size:11px; color:var(--text-dim); margin-top:4px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+    .src-badge { display:inline-block; font-size:10px; padding:2px 8px; border-radius:99px; border:1px solid var(--border); background:var(--orange-dim); color:var(--orange); font-weight:600; }
+    .src-badge.dim { background:var(--card2); color:var(--text-dim); border-color:rgba(255,255,255,0.08); }
+    .traffic-head { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+    .traffic-range { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .traffic-range select, .traffic-range input[type=date] { background:var(--card2); border:1.5px solid var(--border); color:var(--text); padding:8px 10px; border-radius:8px; font-size:13px; outline:none; font-family:'Exo 2',sans-serif; }
+    .traffic-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
+    @media(max-width:900px){ .traffic-grid { grid-template-columns:1fr; } }
+    .traffic-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .traffic-table th { text-align:left; font-size:11px; color:var(--text-dim); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--border); }
+    .traffic-table td { padding:8px; border-bottom:1px solid rgba(255,255,255,0.05); }
+    .traffic-row { cursor:pointer; }
+    .traffic-row:hover td { background:var(--orange-dim); }
+    .traffic-count { color:var(--orange); font-weight:700; text-align:right; }
+    .traffic-empty { color:var(--text-dim); font-size:13px; padding:14px; text-align:center; }
+    .acq-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    @media(max-width:640px){ .acq-grid { grid-template-columns:1fr; } .user-filters select { max-width:none; flex:1 1 140px; } }
+    .acq-item { background:var(--card2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; min-width:0; }
+    .acq-label { font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; }
+    .acq-value { font-size:13px; font-weight:600; margin-top:2px; word-break:break-word; }
+    .section-sub { font-size:12px; color:var(--orange); font-weight:700; margin:16px 0 8px; text-transform:uppercase; letter-spacing:.4px; }
+    .gen-output { background:var(--card2); border:1px solid var(--border); border-radius:8px; padding:10px; font-family:monospace; font-size:12px; word-break:break-all; color:#4ade80; min-height:38px; margin:10px 0; }
+    .gen-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    @media(max-width:640px){ .gen-grid { grid-template-columns:1fr; } }
+    .gen-hint { font-size:11px; color:var(--text-dim); margin-top:4px; }
   </style>
 </head>
 <body>
@@ -152,7 +186,7 @@
 <!-- LOGIN -->
 <div id="loginPage" class="login-container">
   <div class="login-box">
-    <div class="login-logo">⚙️ SamWeb Admin</div>
+    <div class="login-logo">⚙️ Sayem WebStore Admin</div>
     <div class="input-group">
       <label>Username / Email</label>
       <input type="text" id="adminUser" placeholder="Enter username or email">
@@ -168,7 +202,7 @@
 <!-- DASHBOARD -->
 <div id="adminDashboard" style="display:none;">
   <header class="header">
-    <div class="header-logo">⚙️ SamWeb Admin</div>
+    <div class="header-logo">⚙️ Sayem WebStore Admin</div>
     <div class="header-actions">
       <a class="btn btn-outline btn-sm" href="../" target="_blank" rel="noopener" style="text-decoration:none;">🌐 View Website</a>
       <button class="btn btn-outline btn-sm" id="btnLogout">🚪 Logout</button>
@@ -195,6 +229,7 @@
       <button class="admin-tab" data-panel="appsList">📋 Apps</button>
       <button class="admin-tab" data-panel="usersList">👥 Users</button>
       <button class="admin-tab" data-panel="reportsPanel">📊 Reports</button>
+      <button class="admin-tab" data-panel="trafficPanel">📈 Traffic Sources</button>
       <button class="admin-tab" data-panel="adsPanel">🎯 Ads Manager</button>
       <button class="admin-tab" data-panel="settings">⚙️ Settings</button>
     </div>
@@ -239,6 +274,12 @@
           <div class="input-group" style="margin-bottom:10px;"><label>Image URL</label><input id="aImageUrl" placeholder="https://example.com/image.png"></div>
         </div>
         <div class="input-group" style="margin-bottom:10px;"><label>Download Link</label><input id="aLink" placeholder="https://play.google.com/..."></div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📦 Version Info (optional — used for app update checking &amp; SEO)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div class="input-group" style="margin-bottom:10px;"><label>Version Name</label><input id="aVersionName" placeholder="2.5.1"></div>
+          <div class="input-group" style="margin-bottom:10px;"><label>Version Code</label><input id="aVersionCode" type="number" min="0" step="1" placeholder="25"></div>
+          <div class="input-group" style="margin-bottom:10px;"><label>Package Name</label><input id="aPackageName" placeholder="com.example.app"></div>
+        </div>
         <div class="input-group" style="margin-bottom:10px;"><label>Description *</label><textarea id="aDesc" rows="2" placeholder="Describe the app..."></textarea></div>
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📸 App Screenshots (optional)</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -259,12 +300,93 @@
 
     <div class="admin-panel" id="usersList">
       <div style="font-weight:700;font-size:18px;margin-bottom:16px;">👥 Users</div>
+      <div class="user-filters">
+        <input type="text" id="userSearchInput" placeholder="🔍 Search name, email, phone, source, campaign..." aria-label="Search users">
+        <select id="userSourceFilter" aria-label="Filter by source">
+          <option value="">All Sources</option>
+          <optgroup label="Named sources">
+            <option value="Google">Google</option>
+            <option value="Facebook">Facebook</option>
+            <option value="Instagram">Instagram</option>
+            <option value="TikTok">TikTok</option>
+            <option value="YouTube">YouTube</option>
+            <option value="Telegram">Telegram</option>
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="Messenger">Messenger</option>
+          </optgroup>
+          <optgroup label="Source types">
+            <option value="Search">Search</option>
+            <option value="Social">Social</option>
+            <option value="Messaging">Messaging</option>
+            <option value="Referral">Referral</option>
+            <option value="Direct">Direct</option>
+            <option value="Other">Other</option>
+            <option value="Unknown">Unknown</option>
+          </optgroup>
+          <option value="__custom__">Other external domains</option>
+          <option value="__none__">No data (legacy users)</option>
+        </select>
+        <select id="userCampaignFilter" aria-label="Filter by campaign"><option value="">All Campaigns</option></select>
+        <button class="btn btn-outline btn-xs" id="btnClearUserFilters">✕ Clear</button>
+        <span class="user-filter-count" id="userFilterCount"></span>
+      </div>
       <div id="adminUsersList"><div class="spinner"></div></div>
     </div>
 
     <div class="admin-panel" id="reportsPanel">
       <div style="font-weight:700;font-size:18px;margin-bottom:16px;">📊 Reports</div>
       <div id="adminReportsList"><div class="spinner"></div></div>
+    </div>
+
+    <!-- ============ TRAFFIC SOURCES (signup attribution analytics) ============ -->
+    <div class="admin-panel" id="trafficPanel">
+      <div class="traffic-head">
+        <div style="font-weight:700;font-size:18px;">📈 Traffic Sources</div>
+        <div class="traffic-range">
+          <select id="trafficRangeSelect" aria-label="Date range">
+            <option value="all">All Time</option>
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d" selected>Last 30 Days</option>
+            <option value="month">This Month</option>
+            <option value="custom">Custom Range</option>
+          </select>
+          <input type="date" id="trafficFrom" class="hidden" aria-label="From date">
+          <input type="date" id="trafficTo" class="hidden" aria-label="To date">
+        </div>
+      </div>
+      <div class="admin-stats" id="trafficStatsGrid"><div class="traffic-empty">Loading…</div></div>
+      <div class="traffic-grid">
+        <div class="dash-card">
+          <div class="dash-card-title"><span>🌐 Signups by Source</span><span style="font-size:11px;color:var(--text-dim);font-weight:400;">click a row → view users</span></div>
+          <div id="trafficSourceTable"><div class="spinner"></div></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-title"><span>🎯 Signups by Campaign (utm_campaign)</span></div>
+          <div id="trafficCampaignTable"><div class="spinner"></div></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-title"><span>🗣️ "How did you hear about us?" answers</span></div>
+          <div id="trafficAnswerTable"><div class="spinner"></div></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-title"><span>🔗 Campaign Link Generator</span></div>
+          <div class="input-group" style="margin-bottom:10px;"><label>Destination (path on Sayem WebStore)</label><input id="genDest" value="/" placeholder="/ or /apps or /app/some-app"><div class="gen-hint">Relative paths only — links always point to https://sayemwebstore.vercel.app</div></div>
+          <div class="gen-grid">
+            <div class="input-group" style="margin-bottom:10px;"><label>utm_source *</label><input id="genSource" placeholder="facebook"></div>
+            <div class="input-group" style="margin-bottom:10px;"><label>utm_medium</label><input id="genMedium" placeholder="social"></div>
+            <div class="input-group" style="margin-bottom:10px;"><label>utm_campaign</label><input id="genCampaign" placeholder="app_launch"></div>
+            <div class="input-group" style="margin-bottom:10px;"><label>utm_content</label><input id="genContent" placeholder="hero_banner"></div>
+            <div class="input-group" style="margin-bottom:10px;"><label>utm_term</label><input id="genTerm" placeholder="free apps"></div>
+          </div>
+          <div class="gen-output" id="genLinkOutput">Fill utm_source to generate a tracking link…</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" id="btnGenerateCampaignLink">🔗 Generate</button>
+            <button class="btn btn-primary btn-sm" id="btnCopyCampaignLink">📋 Copy</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ============ ADS MANAGER ============ -->
@@ -335,7 +457,7 @@
 
       <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px;">
         <div style="font-weight:700;font-size:18px;margin-bottom:16px;">🌐 Website Settings</div>
-        <div class="input-group"><label>Website Name</label><input id="websiteNameInput" value="SamWeb Store" placeholder="SamWeb Store"></div>
+        <div class="input-group"><label>Website Name</label><input id="websiteNameInput" value="Sayem WebStore" placeholder="Sayem WebStore"></div>
         <div class="input-group">
           <label>Website Logo Image URL</label>
           <input id="logoUrlInput" placeholder="https://example.com/logo.png" type="url">
@@ -352,6 +474,17 @@
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- USER DETAIL MODAL -->
+<div class="overlay hidden" id="userDetailOverlay">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <span class="modal-title">👤 User Details</span>
+      <button class="modal-close-btn" data-close="userDetailOverlay">✕</button>
+    </div>
+    <div id="userDetailContent"><div class="spinner"></div></div>
   </div>
 </div>
 
@@ -415,6 +548,11 @@ window.dispatchEvent(new Event('firebaseReady'));
 let firebaseReady = false, currentAdminKey = null, allVisitorsData = [], currentVisitorKey = null;
 let confirmCallback = null;
 let cachedAds = [], cachedAdStats = {};
+let allUsersCache = null;                     // [{key, ...user}] — single fetch reused by Users + Traffic
+let userFilters = { q: '', source: '', campaign: '' };
+let trafficRange = '30d';
+let currentDetailUserKey = null;
+const SITE_ORIGIN = 'https://sayemwebstore.vercel.app';
 
 // ============ AD PLACEMENT MAP ============
 const AD_SLOTS = [
@@ -621,6 +759,30 @@ document.addEventListener('click', function (e) {
     showConfirm('Delete User?', 'This cannot be undone.', () => deleteUser(key));
     return;
   }
+  if (id.startsWith('delUserBtn2_')) {
+    const key = id.replace('delUserBtn2_', '');
+    showConfirm('Delete User?', 'This cannot be undone.', () => deleteUser(key));
+    return;
+  }
+  if (id.startsWith('viewUserBtn_')) { showUserDetail(id.replace('viewUserBtn_', '')); return; }
+  if (id === 'btnClearUserFilters' || target.closest('#btnClearUserFilters')) {
+    userFilters = { q: '', source: '', campaign: '' };
+    const q = document.getElementById('userSearchInput'); if (q) q.value = '';
+    const sf = document.getElementById('userSourceFilter'); if (sf) sf.value = '';
+    renderUsers();
+    return;
+  }
+  if (id === 'btnGenerateCampaignLink' || target.closest('#btnGenerateCampaignLink')) { generateCampaignLink(); return; }
+  if (id === 'btnCopyCampaignLink' || target.closest('#btnCopyCampaignLink')) { copyCampaignLink(); return; }
+
+  const trafficRow = target.closest('.traffic-row');
+  if (trafficRow) {
+    const src = trafficRow.getAttribute('data-traffic-source');
+    const camp = trafficRow.getAttribute('data-traffic-campaign');
+    if (src) applySourceFilterFromTraffic(src);
+    else if (camp) applyCampaignFilterFromTraffic(camp);
+    return;
+  }
   if (id.startsWith('delReportBtn_')) {
     const key = id.replace('delReportBtn_', '');
     showConfirm('Delete Report?', 'This cannot be undone.', () => deleteReport(key));
@@ -633,6 +795,32 @@ document.addEventListener('change', function (e) {
   const t = e.target;
   if (t && t.matches('.ad-toggle')) {
     toggleAdEnabled(t.getAttribute('data-ad-key'), t.checked);
+  }
+  if (!t || !t.id) return;
+  if (t.id === 'userSourceFilter') { userFilters.source = t.value; renderUsers(); }
+  if (t.id === 'userCampaignFilter') { userFilters.campaign = t.value; renderUsers(); }
+  if (t.id === 'trafficRangeSelect') {
+    trafficRange = t.value;
+    const from = document.getElementById('trafficFrom');
+    const to = document.getElementById('trafficTo');
+    if (from) from.classList.toggle('hidden', trafficRange !== 'custom');
+    if (to) to.classList.toggle('hidden', trafficRange !== 'custom');
+    renderTraffic();
+  }
+  if (t.id === 'trafficFrom' || t.id === 'trafficTo') renderTraffic();
+});
+
+// Live typing: user search + campaign link generator
+let userSearchTimer = null;
+document.addEventListener('input', function (e) {
+  const t = e.target;
+  if (!t || !t.id) return;
+  if (t.id === 'userSearchInput') {
+    clearTimeout(userSearchTimer);
+    userSearchTimer = setTimeout(() => { userFilters.q = t.value || ''; renderUsers(); }, 180);
+  }
+  if (['genDest', 'genSource', 'genMedium', 'genCampaign', 'genContent', 'genTerm'].includes(t.id)) {
+    generateCampaignLink();
   }
 });
 
@@ -649,6 +837,7 @@ function showPanel(id) {
   if (id === 'appsList') loadApps();
   if (id === 'usersList') loadUsers();
   if (id === 'reportsPanel') loadReports();
+  if (id === 'trafficPanel') loadTraffic();
   if (id === 'adsPanel') loadAdsPanel();
   if (id === 'settings') loadSettingsDisplay();
 }
@@ -943,13 +1132,25 @@ async function addApp() {
   const img = document.getElementById('aImageUrl').value.trim();
   const lk = document.getElementById('aLink').value.trim();
   const d = document.getElementById('aDesc').value.trim();
+  const vn = document.getElementById('aVersionName').value.trim();
+  const vcRaw = document.getElementById('aVersionCode').value.trim();
+  const pkg = document.getElementById('aPackageName').value.trim();
   const s1 = document.getElementById('aScreen1').value.trim();
   const s2 = document.getElementById('aScreen2').value.trim();
   const s3 = document.getElementById('aScreen3').value.trim();
   const s4 = document.getElementById('aScreen4').value.trim();
   const s5 = document.getElementById('aScreen5').value.trim();
   if (!n || !d) { toast('Name and Description are required', 'error'); return; }
-  const appData = { name: n, icon: ic, imageUrl: img || null, category: c, description: d, link: lk || null, downloads: 0 };
+  let vc = null;
+  if (vcRaw !== '') {
+    vc = Number(vcRaw);
+    if (!Number.isInteger(vc) || vc < 0) { toast('Version Code must be a whole number (e.g. 25)', 'error'); return; }
+  }
+  if (pkg && !/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(pkg)) { toast('Package Name looks invalid (e.g. com.example.app)', 'error'); return; }
+  const appData = { name: n, icon: ic, imageUrl: img || null, category: c, description: d, link: lk || null, downloads: 0, createdAt: Date.now() };
+  appData.versionName = vn || null;
+  appData.versionCode = vc;
+  appData.packageName = pkg || null;
   if (s1) appData.screenshot1 = s1;
   if (s2) appData.screenshot2 = s2;
   if (s3) appData.screenshot3 = s3;
@@ -959,7 +1160,7 @@ async function addApp() {
     await window._set(window._push(window._ref(window._db, 'apps')), appData);
     toast('✅ App added successfully!', 'success');
     await logActivity('➕ Added App', n);
-    ['aName','aImageUrl','aDesc','aLink','aScreen1','aScreen2','aScreen3','aScreen4','aScreen5'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['aName','aImageUrl','aDesc','aLink','aVersionName','aVersionCode','aPackageName','aScreen1','aScreen2','aScreen3','aScreen4','aScreen5'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     document.getElementById('aIcon').value = '📱';
     loadApps(); updateStats();
   } catch (e) { toast('Error: ' + e.message, 'error'); }
@@ -982,9 +1183,10 @@ function loadApps() {
       }
       h += `<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;align-items:center;gap:12px;margin-bottom:8px;">
         <div>${a.imageUrl ? `<img src="${esc(a.imageUrl)}" style="width:40px;height:40px;border-radius:10px;object-fit:cover;" onerror="this.style.display='none'">` : ''}<span style="font-size:32px;">${esc(a.icon || '📱')}</span></div>
-        <div style="flex:1;">
+        <div style="flex:1;min-width:0;">
           <div style="font-weight:600;">${esc(a.name)}</div>
           <div style="font-size:11px;color:var(--text-dim);">${esc(a.category)} • ⭐${rating.toFixed(1)} • ${formatNum(a.downloads || 0)} DL</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px;word-break:break-all;">${a.versionName ? `v${esc(a.versionName)}` : ''}${a.versionCode !== null && a.versionCode !== undefined ? ` (code ${esc(String(a.versionCode))})` : ''}${a.packageName ? ` • ${esc(a.packageName)}` : ''}${!a.versionName && (a.versionCode === null || a.versionCode === undefined) && !a.packageName ? '<span style="opacity:.6;">no version info</span>' : ''}</div>
         </div>
         <div style="display:flex;gap:6px;">
           <button class="btn btn-outline btn-sm" id="editAppBtn_${c.key}">✏️ Edit</button>
@@ -1026,6 +1228,12 @@ function openEditApp(k) {
         <div class="input-group" style="margin-bottom:10px;"><label>Image URL</label><input id="editImageUrl" value="${esc(a.imageUrl || '')}" placeholder="https://..."></div>
       </div>
       <div class="input-group" style="margin-bottom:10px;"><label>Link</label><input id="editLink" value="${esc(a.link || '')}" placeholder="https://..."></div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📦 Version Info</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div class="input-group" style="margin-bottom:10px;"><label>Version Name</label><input id="editVersionName" value="${esc(a.versionName || '')}" placeholder="2.5.1"></div>
+        <div class="input-group" style="margin-bottom:10px;"><label>Version Code</label><input id="editVersionCode" type="number" min="0" step="1" value="${a.versionCode !== null && a.versionCode !== undefined ? esc(String(a.versionCode)) : ''}" placeholder="25"></div>
+        <div class="input-group" style="margin-bottom:10px;"><label>Package Name</label><input id="editPackageName" value="${esc(a.packageName || '')}" placeholder="com.example.app"></div>
+      </div>
       <div class="input-group" style="margin-bottom:10px;"><label>Description</label><textarea id="editDesc" rows="2" placeholder="App description...">${esc(a.description || '')}</textarea></div>
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📸 App Screenshots</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -1049,13 +1257,23 @@ async function saveEditApp() {
   const img = document.getElementById('editImageUrl')?.value.trim();
   const lk = document.getElementById('editLink')?.value.trim();
   const d = document.getElementById('editDesc')?.value.trim();
+  const vn = document.getElementById('editVersionName')?.value.trim() || '';
+  const vcRaw = document.getElementById('editVersionCode')?.value.trim() || '';
+  const pkg = document.getElementById('editPackageName')?.value.trim() || '';
   const s1 = document.getElementById('editScreen1')?.value.trim();
   const s2 = document.getElementById('editScreen2')?.value.trim();
   const s3 = document.getElementById('editScreen3')?.value.trim();
   const s4 = document.getElementById('editScreen4')?.value.trim();
   const s5 = document.getElementById('editScreen5')?.value.trim();
   if (!n || !d) { toast('Name and Description are required', 'error'); return; }
+  let vc = null;
+  if (vcRaw !== '') {
+    vc = Number(vcRaw);
+    if (!Number.isInteger(vc) || vc < 0) { toast('Version Code must be a whole number (e.g. 25)', 'error'); return; }
+  }
+  if (pkg && !/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(pkg)) { toast('Package Name looks invalid (e.g. com.example.app)', 'error'); return; }
   const updates = { name: n, category: c, icon: ic, imageUrl: img || null, link: lk || null, description: d,
+    versionName: vn || null, versionCode: vc, packageName: pkg || null, updatedAt: Date.now(),
     screenshot1: s1 || null, screenshot2: s2 || null, screenshot3: s3 || null, screenshot4: s4 || null, screenshot5: s5 || null };
   try {
     await window._update(window._ref(window._db, 'apps/' + k), updates);
@@ -1067,26 +1285,392 @@ async function saveEditApp() {
 }
 
 // ============ USERS ============
+// Attribution helpers — read the nested acquisition object saved at signup.
+// Old users without acquisition keep working: everything degrades to '—'.
+function getUserAcq(u) { return (u && u.acquisition && typeof u.acquisition === 'object') ? u.acquisition : null; }
+function getUserSignup(u) { const a = getUserAcq(u); return (a && a.signup && typeof a.signup === 'object') ? a.signup : null; }
+function getUserSignupSource(u) { const sg = getUserSignup(u); return (sg && sg.source) || u.signupSource || ''; }
+function getUserSignupType(u) { const sg = getUserSignup(u); return (sg && sg.sourceType) || ''; }
+function getUserCampaign(u) { const sg = getUserSignup(u); return (sg && sg.campaign) || u.signupCampaign || ''; }
+function getUserAnswer(u) { const a = getUserAcq(u); return (a && a.userSelectedSource) || ''; }
+function getUserSignupTs(u) {
+  const sg = getUserSignup(u);
+  const ts = Number(sg && sg.signupAt) || Number(u.createdAt) || 0;
+  return Number.isFinite(ts) && ts > 0 ? ts : 0;
+}
+function fmtSignupDate(ts) {
+  if (!ts) return '—';
+  try { return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  catch { return '—'; }
+}
+function fmtDateTime(ts) {
+  if (!ts) return '—';
+  try { return new Date(ts).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+  catch { return '—'; }
+}
+
+const NAMED_SOURCES = ['Google', 'Facebook', 'Instagram', 'TikTok', 'YouTube', 'Telegram', 'WhatsApp', 'Messenger'];
+const SOURCE_TYPES = ['Search', 'Social', 'Messaging', 'Referral', 'Direct', 'Other', 'Unknown'];
+
+function userMatchesSource(u, filterVal) {
+  if (!filterVal) return true;
+  const src = getUserSignupSource(u);
+  const type = getUserSignupType(u);
+  if (filterVal === '__none__') return !src;
+  if (filterVal === '__custom__') return !!src && !NAMED_SOURCES.includes(src) && !SOURCE_TYPES.includes(src) && src !== 'Direct' && src !== 'Unknown';
+  if (NAMED_SOURCES.includes(filterVal)) return src === filterVal;
+  if (SOURCE_TYPES.includes(filterVal)) return type === filterVal || src === filterVal;
+  return src === filterVal; // any other captured source string (e.g. example.com, X (Twitter))
+}
+
+function filteredUsers() {
+  const users = allUsersCache || [];
+  const q = userFilters.q.trim().toLowerCase();
+  return users.filter(u => {
+    if (!userMatchesSource(u, userFilters.source)) return false;
+    if (userFilters.campaign && getUserCampaign(u) !== userFilters.campaign) return false;
+    if (q) {
+      const hay = `${u.name || ''} ${u.email || ''} ${u.number || ''} ${getUserSignupSource(u)} ${getUserCampaign(u)} ${getUserAnswer(u)}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function buildCampaignOptions() {
+  const sel = document.getElementById('userCampaignFilter');
+  if (!sel) return;
+  const campaigns = [...new Set((allUsersCache || []).map(getUserCampaign).filter(Boolean))].sort();
+  const current = userFilters.campaign;
+  sel.innerHTML = '<option value="">All Campaigns</option>' +
+    campaigns.map(c => `<option value="${esc(c)}"${c === current ? ' selected' : ''}>${esc(c)}</option>`).join('');
+}
+
+function renderUsers() {
+  const l = document.getElementById('adminUsersList');
+  if (!l) return;
+  buildCampaignOptions();
+  const countEl = document.getElementById('userFilterCount');
+  if (!allUsersCache) { l.innerHTML = '<div class="spinner"></div>'; return; }
+  if (!allUsersCache.length) {
+    l.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center;">No users registered yet</div>';
+    if (countEl) countEl.textContent = '';
+    return;
+  }
+  const rows = filteredUsers();
+  if (countEl) {
+    countEl.textContent = rows.length === allUsersCache.length
+      ? `${rows.length} user${rows.length === 1 ? '' : 's'}`
+      : `Showing ${rows.length} of ${allUsersCache.length} users`;
+  }
+  if (!rows.length) {
+    l.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center;">No users match the current filters</div>';
+    return;
+  }
+  const sorted = rows.slice().sort((a, b) => getUserSignupTs(b) - getUserSignupTs(a));
+  l.innerHTML = sorted.map(u => {
+    const src = getUserSignupSource(u);
+    const camp = getUserCampaign(u);
+    const srcBadge = src
+      ? `<span class="src-badge">${esc(src)}</span>`
+      : `<span class="src-badge dim">no data</span>`;
+    return `<div class="user-row">
+      <div class="user-row-main">
+        <div style="font-weight:600;">${esc(u.name || 'User')} ${srcBadge}</div>
+        <div class="user-meta">
+          <span>${esc(u.email || u.number || '')}</span>
+          <span>•</span><span>${esc(u.gender || 'N/A')}</span>
+          ${camp ? `<span>•</span><span class="src-badge dim">🎯 ${esc(camp)}</span>` : ''}
+          <span>•</span><span>📅 ${esc(fmtSignupDate(getUserSignupTs(u)))}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-outline btn-sm" id="viewUserBtn_${esc(u.key)}">👁 View</button>
+        <button class="btn btn-danger btn-sm" id="delUserBtn_${esc(u.key)}">🗑 Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function loadUsers() {
   if (!firebaseReady) { setTimeout(loadUsers, 600); return; }
   const l = document.getElementById('adminUsersList');
-  if (!l) return;
-  l.innerHTML = '<div class="spinner"></div>';
+  if (l && !allUsersCache) l.innerHTML = '<div class="spinner"></div>';
   window._get(window._ref(window._db, 'users')).then(s => {
-    if (!s.exists()) { l.innerHTML = '<div style="color:var(--text-dim);padding:20px;text-align:center;">No users registered yet</div>'; return; }
-    let h = '';
-    s.forEach(c => {
-      const u = c.val();
-      h += `<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;align-items:center;gap:12px;margin-bottom:8px;">
-        <div style="flex:1;">
-          <div style="font-weight:600;">${esc(u.name)}</div>
-          <div style="font-size:11px;color:var(--text-dim);">${esc(u.email || u.number)} • ${esc(u.gender || 'N/A')}</div>
-        </div>
-        <button class="btn btn-danger btn-sm" id="delUserBtn_${c.key}">🗑 Delete</button>
+    allUsersCache = [];
+    if (s.exists()) {
+      s.forEach(c => { const u = c.val() || {}; allUsersCache.push({ ...u, key: c.key }); });
+    }
+    renderUsers();
+  }).catch(e => {
+    if (l) l.innerHTML = '<div style="color:red;padding:10px;">Error loading users</div>';
+  });
+}
+
+// ============ USER DETAIL (acquisition info) ============
+function showUserDetail(k) {
+  const u = (allUsersCache || []).find(x => x.key === k);
+  if (!u) { toast('User not found — refresh the list', 'error'); return; }
+  currentDetailUserKey = k;
+  const acq = getUserAcq(u);
+  const sg = getUserSignup(u);
+  const ft = acq && acq.firstTouch ? acq.firstTouch : null;
+  const lt = acq && acq.latestTouch ? acq.latestTouch : null;
+
+  const item = (label, value) => `<div class="acq-item"><div class="acq-label">${esc(label)}</div><div class="acq-value">${esc(value || '—')}</div></div>`;
+
+  let acqHtml;
+  if (!acq) {
+    acqHtml = `<div class="traffic-empty" style="text-align:left;">No acquisition data — this user registered before source tracking existed. Everything else works normally.</div>`;
+  } else {
+    acqHtml = `
+      <div class="section-sub">Signup Attribution</div>
+      <div class="acq-grid">
+        ${item('Detected Source', sg && sg.source)}
+        ${item('Source Type', sg && sg.sourceType)}
+        ${item('Medium', sg && sg.medium)}
+        ${item('Campaign', sg && sg.campaign)}
+        ${item('Content', sg && sg.content)}
+        ${item('Term', sg && sg.term)}
+        ${item('Signup Landing Page', sg && sg.landingPage)}
+        ${item('Signup Time', fmtDateTime(getUserSignupTs(u)))}
+        ${item("User's Answer (How did you hear?)", getUserAnswer(u))}
+      </div>
+      <div class="section-sub">First Touch (original acquisition — never overwritten)</div>
+      <div class="acq-grid">
+        ${item('Source', ft && ft.source)}
+        ${item('Source Type', ft && ft.sourceType)}
+        ${item('Campaign', ft && ft.campaign)}
+        ${item('Landing Page', ft && ft.landingPage)}
+        ${item('First Seen', fmtDateTime(ft && Number(ft.firstSeenAt)))}
+      </div>
+      <div class="section-sub">Latest Touch (last external source before signup)</div>
+      <div class="acq-grid">
+        ${item('Source', lt && lt.source)}
+        ${item('Source Type', lt && lt.sourceType)}
+        ${item('Campaign', lt && lt.campaign)}
+        ${item('Landing Page', lt && lt.landingPage)}
+        ${item('Last Seen', fmtDateTime(lt && Number(lt.lastSeenAt)))}
       </div>`;
-    });
-    l.innerHTML = h;
-  }).catch(e => { l.innerHTML = '<div style="color:red;padding:10px;">Error loading users</div>'; });
+  }
+
+  document.getElementById('userDetailContent').innerHTML = `
+    <div class="section-sub">Profile</div>
+    <div class="acq-grid">
+      ${item('Name', u.name)}
+      ${item('Email', u.email)}
+      ${item('Phone', u.number)}
+      ${item('Gender', u.gender)}
+      ${item('Signup Date', fmtSignupDate(getUserSignupTs(u)))}
+      ${item('User Key', u.key)}
+    </div>
+    ${acqHtml}
+    <div style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-danger btn-sm" id="delUserBtn2_${esc(u.key)}">🗑 Delete User</button>
+      <button class="btn btn-outline btn-sm" data-close="userDetailOverlay">Close</button>
+    </div>`;
+  document.getElementById('userDetailOverlay').classList.remove('hidden');
+}
+
+// ============ TRAFFIC SOURCES ANALYTICS ============
+function getRangeBounds(range, fromStr, toStr) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const DAY = 86400000;
+  switch (range) {
+    case 'today': return [startOfToday, Infinity];
+    case 'yesterday': return [startOfToday - DAY, startOfToday];
+    case '7d': return [startOfToday - 6 * DAY, Infinity];
+    case '30d': return [startOfToday - 29 * DAY, Infinity];
+    case 'month': return [new Date(now.getFullYear(), now.getMonth(), 1).getTime(), Infinity];
+    case 'custom': {
+      const f = fromStr ? new Date(fromStr + 'T00:00:00').getTime() : 0;
+      const t = toStr ? new Date(toStr + 'T00:00:00').getTime() + DAY : Infinity;
+      return [Number.isFinite(f) ? f : 0, Number.isFinite(t) ? t : Infinity];
+    }
+    default: return [0, Infinity]; // all time
+  }
+}
+
+function rangeLabel(range) {
+  return { all: 'All time', today: 'Today', yesterday: 'Yesterday', '7d': 'Last 7 days', '30d': 'Last 30 days', month: 'This month', custom: 'Custom range' }[range] || 'All time';
+}
+
+function computeTrafficAnalytics(users, range, fromStr, toStr) {
+  const [from, to] = getRangeBounds(range, fromStr, toStr);
+  const inRange = users.filter(u => { const ts = getUserSignupTs(u); return ts >= from && ts < to; });
+  const bySource = {};
+  const byType = {};
+  const byCampaign = {};
+  const byAnswer = {};
+  let attributed = 0, legacy = 0;
+  for (const u of inRange) {
+    const src = getUserSignupSource(u);
+    const type = getUserSignupType(u);
+    if (!src) { legacy++; continue; }
+    attributed++;
+    bySource[src] = (bySource[src] || 0) + 1;
+    if (type) byType[type] = (byType[type] || 0) + 1;
+    const camp = getUserCampaign(u);
+    if (camp) byCampaign[camp] = (byCampaign[camp] || 0) + 1;
+    const ans = getUserAnswer(u);
+    if (ans) byAnswer[ans] = (byAnswer[ans] || 0) + 1;
+  }
+  return { inRangeCount: inRange.length, attributed, legacy, bySource, byType, byCampaign, byAnswer };
+}
+
+function statCard(value, label, highlight) {
+  return `<div class="stat-card${highlight ? ' stat-highlight' : ''}"><div class="stat-number">${esc(String(value))}</div> <div class="stat-label">${esc(label)}</div></div>`;
+}
+
+function renderTraffic() {
+  const users = allUsersCache || [];
+  const fromStr = document.getElementById('trafficFrom')?.value || '';
+  const toStr = document.getElementById('trafficTo')?.value || '';
+  const stats = computeTrafficAnalytics(users, trafficRange, fromStr, toStr);
+  const label = rangeLabel(trafficRange);
+
+  const grid = document.getElementById('trafficStatsGrid');
+  if (grid) {
+    grid.innerHTML =
+      statCard(stats.attributed, `Attributed Signups · ${label}`, true) +
+      statCard(stats.bySource['Google'] || 0, 'Google') +
+      statCard(stats.bySource['Facebook'] || 0, 'Facebook') +
+      statCard(stats.bySource['Instagram'] || 0, 'Instagram') +
+      statCard(stats.bySource['TikTok'] || 0, 'TikTok') +
+      statCard(stats.bySource['YouTube'] || 0, 'YouTube') +
+      statCard(stats.bySource['Direct'] || stats.byType['Direct'] || 0, 'Direct') +
+      statCard(stats.byType['Referral'] || 0, 'Referral') +
+      statCard(stats.bySource['Unknown'] || 0, 'Unknown') +
+      statCard(stats.legacy, 'Legacy (no data)');
+  }
+
+  const srcTable = document.getElementById('trafficSourceTable');
+  if (srcTable) {
+    const rows = Object.entries(stats.bySource).sort((a, b) => b[1] - a[1]);
+    srcTable.innerHTML = rows.length
+      ? `<table class="traffic-table"><thead><tr><th>Source</th><th>Type</th><th style="text-align:right;">Signups</th></tr></thead><tbody>${
+          rows.map(([src, n]) => {
+            const type = users.map(getUserSignupType).find((t, i) => getUserSignupSource(users[i]) === src && t) || '';
+            return `<tr class="traffic-row" data-traffic-source="${esc(src)}"><td>${esc(src)}</td><td style="color:var(--text-dim);font-size:12px;">${esc(type)}</td><td class="traffic-count">${n}</td></tr>`;
+          }).join('')}</tbody></table>`
+      : `<div class="traffic-empty">No attributed signups in this range.</div>`;
+  }
+
+  const campTable = document.getElementById('trafficCampaignTable');
+  if (campTable) {
+    const rows = Object.entries(stats.byCampaign).sort((a, b) => b[1] - a[1]);
+    campTable.innerHTML = rows.length
+      ? `<table class="traffic-table"><thead><tr><th>Campaign</th><th style="text-align:right;">Signups</th></tr></thead><tbody>${
+          rows.map(([c, n]) => `<tr class="traffic-row" data-traffic-campaign="${esc(c)}"><td>🎯 ${esc(c)}</td><td class="traffic-count">${n}</td></tr>`).join('')
+        }</tbody></table>`
+      : `<div class="traffic-empty">No campaign (utm_campaign) signups in this range.</div>`;
+  }
+
+  const ansTable = document.getElementById('trafficAnswerTable');
+  if (ansTable) {
+    const rows = Object.entries(stats.byAnswer).sort((a, b) => b[1] - a[1]);
+    ansTable.innerHTML = rows.length
+      ? `<table class="traffic-table"><thead><tr><th>User's answer</th><th style="text-align:right;">Signups</th></tr></thead><tbody>${
+          rows.map(([a, n]) => `<tr><td>${esc(a)}</td><td class="traffic-count">${n}</td></tr>`).join('')
+        }</tbody></table>`
+      : `<div class="traffic-empty">No answers recorded in this range.</div>`;
+  }
+}
+
+async function loadTraffic() {
+  if (!firebaseReady) { setTimeout(loadTraffic, 600); return; }
+  if (!allUsersCache) {
+    try {
+      const s = await window._get(window._ref(window._db, 'users'));
+      allUsersCache = [];
+      if (s.exists()) s.forEach(c => { allUsersCache.push({ ...(c.val() || {}), key: c.key }); });
+    } catch { allUsersCache = allUsersCache || []; }
+  }
+  renderTraffic();
+}
+
+function applySourceFilterFromTraffic(source) {
+  userFilters.source = source;
+  userFilters.q = '';
+  const sel = document.getElementById('userSourceFilter');
+  if (sel) {
+    // Custom captured sources (e.g. example.com) are not in the static option list
+    if (![...sel.options].some(o => o.value === source)) {
+      const opt = document.createElement('option');
+      opt.value = source; opt.textContent = source;
+      sel.appendChild(opt);
+    }
+    sel.value = source;
+  }
+  const search = document.getElementById('userSearchInput');
+  if (search) search.value = '';
+  showPanel('usersList');
+  renderUsers();
+}
+
+function applyCampaignFilterFromTraffic(campaign) {
+  userFilters.campaign = campaign;
+  userFilters.q = '';
+  const search = document.getElementById('userSearchInput');
+  if (search) search.value = '';
+  showPanel('usersList');
+  buildCampaignOptions();
+  const sel = document.getElementById('userCampaignFilter');
+  if (sel) sel.value = campaign;
+  renderUsers();
+}
+
+// ============ CAMPAIGN LINK GENERATOR ============
+function generateCampaignLink() {
+  const out = document.getElementById('genLinkOutput');
+  if (!out) return '';
+  const dest = (document.getElementById('genDest')?.value || '/').trim();
+  const source = (document.getElementById('genSource')?.value || '').trim();
+  const medium = (document.getElementById('genMedium')?.value || '').trim();
+  const campaign = (document.getElementById('genCampaign')?.value || '').trim();
+  const content = (document.getElementById('genContent')?.value || '').trim();
+  const term = (document.getElementById('genTerm')?.value || '').trim();
+
+  if (!source) { out.textContent = 'utm_source is required (e.g. facebook, google, tiktok).'; out.style.color = '#ffc832'; return ''; }
+
+  // Destination must stay on Sayem WebStore: a relative path or the production origin.
+  let path;
+  if (/^\/(?![\/\\])/.test(dest)) path = dest;
+  else if (dest === SITE_ORIGIN || dest === SITE_ORIGIN + '/') path = '/';
+  else if (dest.startsWith(SITE_ORIGIN + '/')) path = dest.slice(SITE_ORIGIN.length);
+  else { out.textContent = '⚠️ Destination must be a path on sayemwebstore.vercel.app (e.g. /apps or /app/some-app).'; out.style.color = '#f87171'; return ''; }
+
+  try {
+    const url = new URL(path, SITE_ORIGIN);
+    url.searchParams.set('utm_source', source.toLowerCase());
+    if (medium) url.searchParams.set('utm_medium', medium.toLowerCase());
+    if (campaign) url.searchParams.set('utm_campaign', campaign.toLowerCase().replace(/\s+/g, '_'));
+    if (content) url.searchParams.set('utm_content', content);
+    if (term) url.searchParams.set('utm_term', term);
+    out.style.color = '#4ade80';
+    out.textContent = url.toString();
+    return url.toString();
+  } catch {
+    out.textContent = '⚠️ Could not build that URL — check the destination path.';
+    out.style.color = '#f87171';
+    return '';
+  }
+}
+
+async function copyCampaignLink() {
+  const link = generateCampaignLink();
+  if (!link) return;
+  try {
+    await navigator.clipboard.writeText(link);
+    toast('📋 Tracking link copied!', 'success');
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = link; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('📋 Tracking link copied!', 'success'); }
+    catch { toast('Copy failed — select the link manually', 'error'); }
+    ta.remove();
+  }
 }
 
 async function deleteUser(k) {
@@ -1096,6 +1680,8 @@ async function deleteUser(k) {
     await window._remove(window._ref(window._db, 'users/' + k));
     toast('✅ User deleted!', 'success');
     await logActivity('🗑 Deleted User', userName);
+    allUsersCache = null;
+    closeModal('userDetailOverlay');
     loadUsers(); updateStats();
   } catch (e) { toast('Error: ' + e.message, 'error'); }
 }
@@ -1376,7 +1962,7 @@ async function updateAdmin() {
 }
 
 async function saveSettings() {
-  const n = document.getElementById('websiteNameInput').value.trim() || 'SamWeb Store';
+  const n = document.getElementById('websiteNameInput').value.trim() || 'Sayem WebStore';
   const logo = document.getElementById('logoUrlInput')?.value.trim();
   localStorage.setItem('website_name', n);
   try {

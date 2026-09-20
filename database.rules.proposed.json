@@ -1,0 +1,66 @@
+{
+  "_comment": "PROPOSED rules — DO NOT DEPLOY until legacy plaintext-password login is migrated to Firebase Auth (see SECURITY.md §1 and §4). Deploying these rules first will break client-side login because it scans /users.",
+  "rules": {
+    "apps": {
+      ".read": true,
+      "$key": {
+        ".write": "auth != null && root.child('adminUids').child(auth.uid).exists()",
+        "downloads": {
+          "_comment": "Public counter so guest downloads keep working; consider moving increments into an authenticated serverless function later.",
+          ".write": true
+        },
+        "reviews": {
+          "$reviewId": {
+            "_comment": "Post-migration: review.userId holds the Firebase Auth uid.",
+            ".write": "auth != null && (root.child('adminUids').child(auth.uid).exists() || newData.child('userId').val() === auth.uid || data.child('userId').val() === auth.uid)"
+          }
+        }
+      }
+    },
+    "settings": {
+      ".read": true,
+      ".write": "auth != null && root.child('adminUids').child(auth.uid).exists()"
+    },
+    "ads": {
+      ".read": true,
+      ".write": "auth != null && root.child('adminUids').child(auth.uid).exists()"
+    },
+    "adStats": {
+      ".read": true,
+      ".write": "auth != null && root.child('adminUids').child(auth.uid).exists()"
+    },
+    "users": {
+      ".read": false,
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('adminUids').child(auth.uid).exists())",
+        ".write": "auth != null && (auth.uid === $uid || root.child('adminUids').child(auth.uid).exists())"
+      }
+    },
+    "reports": {
+      ".read": "auth != null && root.child('adminUids').child(auth.uid).exists()",
+      "$key": {
+        ".write": "auth != null"
+      }
+    },
+    "visitors": {
+      ".read": "auth != null && root.child('adminUids').child(auth.uid).exists()",
+      "$token": {
+        ".write": true
+      }
+    },
+    "adminActivity": {
+      ".read": "auth != null && root.child('adminUids').child(auth.uid).exists()",
+      "$key": {
+        ".write": "auth != null && root.child('adminUids').child(auth.uid).exists()"
+      }
+    },
+    "admins": {
+      ".read": false,
+      ".write": false
+    },
+    "adminUids": {
+      ".read": "auth != null && root.child('adminUids').child(auth.uid).exists()",
+      ".write": false
+    }
+  }
+}

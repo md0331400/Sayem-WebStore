@@ -1,5 +1,23 @@
+# robots.txt — Sayem WebStore
+# https://sayemwebstore.vercel.app/
+#
+# Note: robots.txt is a crawling directive, not a security mechanism.
+# Private areas are protected by Firebase rules + admin credentials.
+
 User-agent: *
 Allow: /
+Allow: /apps
+Allow: /games
+Allow: /app/
+Allow: /game/
+Allow: /style.css
+Allow: /app.js
+Allow: /seo-utils.js
+Allow: /attribution.js
+Allow: /icons/
 Disallow: /admin
+Disallow: /admin/
+Disallow: /api/
+Disallow: /search?q=
 
-Sitemap: https://samva-app-store.firebaseapp.com/sitemap.xml
+Sitemap: https://sayemwebstore.vercel.app/sitemap.xml

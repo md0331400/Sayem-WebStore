@@ -1,9 +1,9 @@
 {
   "id": "./",
-  "name": "SamWeb Store",
-  "short_name": "SamWeb",
-  "description": "A premium cross-platform PWA app store for discovering, reviewing, and downloading apps and games.",
-  "start_url": "./index.html",
+  "name": "Sayem WebStore",
+  "short_name": "Sayem Store",
+  "description": "A free cross-platform PWA app store for discovering, reviewing, and downloading apps and games for Android.",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
@@ -18,13 +18,19 @@
     {
       "name": "Browse Apps",
       "short_name": "Apps",
-      "url": "./index.html#appsSection",
+      "url": "./apps",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Browse Games",
+      "short_name": "Games",
+      "url": "./games",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Featured Picks",
       "short_name": "Featured",
-      "url": "./index.html#featuredSection",
+      "url": "./#featuredSection",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ],

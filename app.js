@@ -1,5 +1,27 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, push, set, get, remove, update, onValue, runTransaction, increment } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import {
+  SITE_ORIGIN,
+  SITE_NAME_DEFAULT,
+  HOME_META,
+  escapeHtml,
+  truncateText,
+  isGameApp,
+  appTypeSegment,
+  buildAppSlugIndex,
+  getAppPath,
+  getAverageRating,
+  getReviewList,
+  resolveUpdateStatus,
+  buildAppViewModel,
+  renderAppDetailInner,
+  renderNotFoundInner,
+  appCardHtml,
+  formatCountLabel,
+  homeJsonLd,
+  appJsonLd,
+} from "./seo-utils.js";
+import { initAttribution, getSignupAcquisition, getSuggestedSignupOption } from "./attribution.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDo4VtvFjkHK_qPKw_8OvjWB3DF93m0_vE",
@@ -23,7 +45,7 @@ window._update = update;
 window._onValue = onValue;
 window._runTransaction = runTransaction;
 
-const DEFAULT_WEBSITE_NAME = "SamWeb Store";
+const DEFAULT_WEBSITE_NAME = SITE_NAME_DEFAULT; // "Sayem WebStore"
 const DEFAULT_LOGO = "icons/icon-192.png";
 const CACHE_KEYS = {
   apps: "samweb_cached_apps_v3",
@@ -40,7 +62,20 @@ let currentAppId = null;
 let selectedRatingValue = 0;
 let deferredInstallPrompt = null;
 let appsSubscribed = false;
-let activeCategory = "All";
+let appsLoadFailed = false;
+let currentSiteName = DEFAULT_WEBSITE_NAME;
+
+// Router / SEO state
+let slugIndex = { byKey: new Map(), bySlug: new Map() };
+let pendingDetailRoute = null;
+let pendingDetailTimer = null;
+let detailVm = null;
+let detailInstallContext = { pkg: null, vc: null }; // Android host params (?pkg=&vc=)
+let lastMetaApply = null;
+let lastNonDetailPath = "/";
+
+// Per-page category filters (home / apps / games keep their own selection)
+const categoryFilter = { home: "All", apps: "All", games: "All" };
 
 const $ = (id) => document.getElementById(id);
 
@@ -55,21 +90,8 @@ function toast(msg, type = "info", dur = 3000) {
   }, dur);
 }
 
-function escapeHtml(value) {
-  if (value === null || value === undefined) return "";
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function formatNum(n) {
-  const num = Number(n) || 0;
-  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-  if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-  return String(num);
+  return formatCountLabel(n);
 }
 
 function toJsString(value) {
@@ -117,6 +139,10 @@ function cacheSettings(settings) {
   setStoredJson(CACHE_KEYS.settings, { ...previous, ...settings });
 }
 
+function getSiteName() {
+  return currentSiteName || DEFAULT_WEBSITE_NAME;
+}
+
 function isIOS() {
   return /iphone|ipad|ipod/i.test(window.navigator.userAgent || "");
 }
@@ -134,8 +160,381 @@ function canShowInstallUI() {
   return !isStandaloneMode();
 }
 
+// ============================================================
+// ROUTER + DYNAMIC SEO METADATA
+// Public URLs: / , /apps , /games , /search , /faq , /terms ,
+// /privacy , /disclaimer , /app/{slug} , /game/{slug}
+// ============================================================
+const ROUTE_PAGES = {
+  "/": "homePage",
+  "/apps": "appsPage",
+  "/games": "gamesPage",
+  "/search": "searchPage",
+  "/faq": "faqPage",
+  "/terms": "termsPage",
+  "/privacy": "privacyPage",
+  "/disclaimer": "disclaimerPage"
+};
+
+const PAGE_PATHS = Object.fromEntries(Object.entries(ROUTE_PAGES).map(([path, pageId]) => [pageId, path]));
+
+let currentRoute = { kind: "page", pageId: "homePage", path: "/" };
+
+function normalizePath(pathname) {
+  let path = String(pathname || "/");
+  if (path === "/index.html") path = "/";
+  if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+  return path;
+}
+
+function setMetaContent(selector, attr, value, createIfMissing) {
+  let el = document.head.querySelector(selector);
+  if (!el && createIfMissing) {
+    el = document.createElement(createIfMissing);
+    document.head.appendChild(el);
+  }
+  if (el) el.setAttribute(attr, value);
+}
+
+function setDocTitle(title) {
+  document.title = title;
+}
+
+function setCanonical(url) {
+  setMetaContent('link[rel="canonical"]', "href", url, 'link');
+  if (document.head.querySelector('link[rel="canonical"]')) {
+    document.head.querySelector('link[rel="canonical"]').setAttribute("rel", "canonical");
+  }
+}
+
+function setMetaRobots(content) {
+  setMetaContent('meta[name="robots"]', "content", content, "meta");
+  document.head.querySelector('meta[name="robots"]')?.setAttribute("name", "robots");
+}
+
+function setMetaDescription(text) {
+  setMetaContent('meta[name="description"]', "content", text, "meta");
+  document.head.querySelector('meta[name="description"]')?.setAttribute("name", "description");
+}
+
+function setOg(prop, content) {
+  const el = document.head.querySelector(`meta[property="og:${prop}"]`);
+  if (el) el.setAttribute("content", content);
+}
+
+function setTwitter(name, content) {
+  const el = document.head.querySelector(`meta[name="twitter:${name}"]`);
+  if (el) el.setAttribute("content", content);
+}
+
+function setPageJsonLd(graph) {
+  const el = $("pageJsonLd");
+  if (el) {
+    try {
+      el.textContent = JSON.stringify(graph);
+    } catch {}
+  }
+}
+
+function defaultOgImage() {
+  return `${SITE_ORIGIN}/icons/icon-512.png`;
+}
+
+/** Applies the standard meta set for a simple (non app-detail) route. */
+function applyPageMeta(pageId, search = "") {
+  const site = getSiteName();
+  const path = PAGE_PATHS[pageId] || "/";
+  const cleanUrl = `${SITE_ORIGIN}${path}`;
+  const metas = {
+    homePage: {
+      title: `${site} — Free Apps & Games Download`,
+      description: HOME_META.description,
+      robots: "index, follow"
+    },
+    appsPage: {
+      title: `Free Android Apps — Tools, Social & More | ${site}`,
+      description: `Browse free Android apps on ${site}: tools, social and utility apps with real user reviews, screenshots, version details and one-tap downloads. No login needed.`,
+      robots: "index, follow"
+    },
+    gamesPage: {
+      title: `Free Android Games Download | ${site}`,
+      description: `Download free Android games on ${site}. Check ratings, real player reviews and screenshots, then install in one tap — no account required.`,
+      robots: "index, follow"
+    },
+    searchPage: {
+      title: `Search Apps & Games | ${site}`,
+      description: `Search the ${site} catalog for apps and games by name, category or keyword.`,
+      robots: "noindex, follow"
+    },
+    faqPage: {
+      title: `Frequently Asked Questions | ${site}`,
+      description: `Answers about downloading apps and games on ${site}: guest downloads, reviews, ratings, safety and accounts.`,
+      robots: "index, follow"
+    },
+    termsPage: {
+      title: `Terms of Use | ${site}`,
+      description: `The terms of use for ${site} — accounts, acceptable use, downloads and changes.`,
+      robots: "index, follow"
+    },
+    privacyPage: {
+      title: `Privacy Policy | ${site}`,
+      description: `What data ${site} collects (account data, usage data, your reviews) and how it is used, stored and protected.`,
+      robots: "index, follow"
+    },
+    disclaimerPage: {
+      title: `Disclaimer | ${site}`,
+      description: `${site} is an independent apps and games discovery platform, not affiliated with Google Play or any listed developer.`,
+      robots: "index, follow"
+    }
+  };
+  const meta = metas[pageId] || metas.homePage;
+
+  lastMetaApply = () => applyPageMeta(pageId, search);
+  setDocTitle(meta.title);
+  setMetaDescription(meta.description);
+  setMetaRobots(meta.robots);
+  setCanonical(cleanUrl);
+  setOg("type", "website");
+  setOg("site_name", site);
+  setOg("title", meta.title);
+  setOg("description", meta.description);
+  setOg("url", cleanUrl);
+  setOg("image", defaultOgImage());
+  setTwitter("card", "summary_large_image");
+  setTwitter("title", meta.title);
+  setTwitter("description", meta.description);
+  setTwitter("image", defaultOgImage());
+
+  if (pageId === "homePage") {
+    setPageJsonLd(homeJsonLd(site));
+  } else {
+    setPageJsonLd({
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "WebSite", "@id": `${SITE_ORIGIN}/#website` },
+        {
+          "@type": "WebPage",
+          url: cleanUrl,
+          name: meta.title,
+          description: meta.description,
+          isPartOf: { "@id": `${SITE_ORIGIN}/#website` }
+        }
+      ]
+    });
+  }
+}
+
+/** Full dynamic metadata for an app/game detail route. */
+function applyDetailMeta(vm) {
+  lastMetaApply = () => applyDetailMeta(vm);
+  const ogImage = vm.app.imageUrl && String(vm.app.imageUrl).startsWith("http") ? String(vm.app.imageUrl) : defaultOgImage();
+  setDocTitle(vm.title);
+  setMetaDescription(vm.metaDescription);
+  setMetaRobots("index, follow");
+  setCanonical(vm.url);
+  setOg("type", "website");
+  setOg("site_name", vm.siteName);
+  setOg("title", `${vm.app.name || vm.typeLabel} — ${vm.typeLabel} Download | ${vm.siteName}`);
+  setOg("description", vm.metaDescription);
+  setOg("url", vm.url);
+  setOg("image", ogImage);
+  setTwitter("card", "summary_large_image");
+  setTwitter("title", `${vm.app.name || vm.typeLabel} — ${vm.typeLabel} Download | ${vm.siteName}`);
+  setTwitter("description", vm.metaDescription);
+  setTwitter("image", ogImage);
+  setPageJsonLd(appJsonLd(vm));
+}
+
+function applyNotFoundMeta(typeLabel, path) {
+  const site = getSiteName();
+  const title = `${typeLabel} Not Found | ${site}`;
+  const description = `That ${typeLabel.toLowerCase()} does not exist on ${site}. Browse all apps and games instead.`;
+  lastMetaApply = () => applyNotFoundMeta(typeLabel, path);
+  setDocTitle(title);
+  setMetaDescription(description);
+  setMetaRobots("noindex, follow");
+  setCanonical(`${SITE_ORIGIN}${path}`);
+  setOg("title", title);
+  setOg("description", description);
+  setOg("url", `${SITE_ORIGIN}${path}`);
+  setOg("image", defaultOgImage());
+  setTwitter("title", title);
+  setTwitter("description", description);
+  setTwitter("image", defaultOgImage());
+  setPageJsonLd(homeJsonLd(site));
+}
+
+function refreshRouteMeta() {
+  try {
+    if (lastMetaApply) lastMetaApply();
+  } catch {}
+}
+
+function navigate(path, opts = {}) {
+  try {
+    const url = new URL(path, window.location.origin);
+    const method = opts.replace ? "replaceState" : "pushState";
+    window.history[method]({ sws: true }, "", `${url.pathname}${url.search}${url.hash}`);
+    applyRoute(url.pathname, url.search, url.hash);
+  } catch {
+    // History API unavailable → fall back to full navigation
+    window.location.href = path;
+  }
+}
+window.navigateTo = navigate;
+
+function applyRouteFromLocation() {
+  applyRoute(window.location.pathname, window.location.search, window.location.hash);
+}
+
+function applyRoute(pathname, search = "", hash = "") {
+  const path = normalizePath(pathname);
+  let params;
+  try {
+    params = new URLSearchParams(search || "");
+  } catch {
+    params = new URLSearchParams();
+  }
+
+  const detailMatch = path.match(/^\/(app|game)\/([^/]+)$/);
+  if (detailMatch) {
+    resolveDetailRoute(detailMatch[2], detailMatch[1], params);
+    return;
+  }
+
+  const pageId = ROUTE_PAGES[path] || "homePage";
+
+  // Legacy /?q=… links → clean /search?q=…
+  if (pageId === "homePage" && params.get("q")) {
+    navigate(`/search?q=${encodeURIComponent(params.get("q"))}`, { replace: true });
+    return;
+  }
+
+  currentRoute = { kind: "page", pageId, path };
+  lastNonDetailPath = path + (search || "");
+
+  if (pageId === "searchPage") {
+    const input = $("searchPageInput");
+    if (input) input.value = params.get("q") || "";
+  }
+
+  if (pageId === "homePage" || pageId === "appsPage" || pageId === "gamesPage") {
+    const pageKey = pageId === "homePage" ? "home" : pageId === "appsPage" ? "apps" : "games";
+    const cat = params.get("category");
+    categoryFilter[pageKey] = cat ? String(cat) : pageKey === "home" ? categoryFilter.home : "All";
+  }
+
+  showPage(pageId);
+  if (pageId === "appsPage" || pageId === "gamesPage" || pageId === "searchPage") loadApps();
+  applyPageMeta(pageId, search);
+  renderApps(filterForCurrentViews());
+  if (pageId === "searchPage") {
+    renderSearchResults();
+    setTimeout(() => $("searchPageInput")?.focus(), 80);
+  }
+  if (hash) {
+    setTimeout(() => {
+      document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }
+}
+
+function resolveDetailRoute(slug, typeHint, params) {
+  const key = slugIndex.bySlug.get(slug);
+  const app = key ? allApps.find((a) => a.key === key) : null;
+
+  if (!allApps.length && !appsLoadFailed) {
+    // Catalog not loaded yet — wait for the first snapshot (or cache) before deciding 404.
+    pendingDetailRoute = { slug, typeHint, params: params.toString() };
+    currentRoute = { kind: "detail-wait", path: `/${typeHint}/${slug}` };
+    showDetailWaiting();
+    loadApps();
+    if (!pendingDetailTimer) {
+      pendingDetailTimer = setTimeout(() => {
+        pendingDetailTimer = null;
+        if (pendingDetailRoute) {
+          pendingDetailRoute = null;
+          renderDetailNotFound(slug, typeHint, true);
+        }
+      }, 20000);
+    }
+    return;
+  }
+
+  if (!app) {
+    renderDetailNotFound(slug, typeHint, false);
+    return;
+  }
+
+  const canonicalPath = getAppPath(app, slugIndex);
+  if (canonicalPath !== `/${typeHint}/${slug}`) {
+    // Wrong type prefix (e.g. /app/<game-slug>) → permanent-style redirect to canonical path
+    const keep = [];
+    if (params.get("pkg")) keep.push(`pkg=${encodeURIComponent(params.get("pkg"))}`);
+    if (params.get("vc")) keep.push(`vc=${encodeURIComponent(params.get("vc"))}`);
+    navigate(keep.length ? `${canonicalPath}?${keep.join("&")}` : canonicalPath, { replace: true });
+    return;
+  }
+
+  openAppDetail(app.key, {
+    fromRoute: true,
+    installedPkg: params.get("pkg"),
+    installedVc: params.get("vc")
+  });
+}
+
+function showDetailWaiting() {
+  const content = $("appDetailPageContent");
+  if (content) {
+    content.innerHTML = '<div class="detail-waiting"><div class="spinner"></div><p>Loading app details…</p></div>';
+  }
+  showPage("appDetailPage");
+  setDocTitle(`${getSiteName()} — Loading…`);
+  setMetaRobots("index, follow");
+}
+
+function renderDetailNotFound(slug, typeHint, loadTimedOut = false) {
+  const typeLabel = typeHint === "game" ? "Game" : "App";
+  pendingDetailRoute = null;
+  currentAppId = null;
+  detailVm = null;
+  currentRoute = { kind: "notfound", path: `/${typeHint}/${slug}` };
+  const content = $("appDetailPageContent");
+  if (content) {
+    content.innerHTML = renderNotFoundInner(typeLabel);
+    if (loadTimedOut) {
+      const note = document.createElement("p");
+      note.className = "detail-note";
+      note.textContent = "We could not load the catalog to verify this link. Check your connection and try again.";
+      content.querySelector(".not-found-block")?.appendChild(note);
+    }
+  }
+  showPage("appDetailPage");
+  applyNotFoundMeta(typeLabel, `/${typeHint}/${slug}`);
+}
+
+function refreshPendingDetailRoute() {
+  if (!pendingDetailRoute || !allApps.length) return;
+  const { slug, typeHint, params } = pendingDetailRoute;
+  pendingDetailRoute = null;
+  if (pendingDetailTimer) {
+    clearTimeout(pendingDetailTimer);
+    pendingDetailTimer = null;
+  }
+  resolveDetailRoute(slug, typeHint, new URLSearchParams(params || ""));
+}
+
+function rebuildSlugIndex() {
+  slugIndex = buildAppSlugIndex(allApps);
+}
+
+function cardHtmlFor(app) {
+  return appCardHtml(app, getAppPath(app, slugIndex));
+}
+
 function applyWebsiteName(name) {
   const finalName = (name || DEFAULT_WEBSITE_NAME).trim() || DEFAULT_WEBSITE_NAME;
+  currentSiteName = finalName;
   const websiteName = $("websiteName");
   const footerBrandName = $("footerBrandName");
   if (websiteName) websiteName.textContent = finalName;
@@ -143,7 +542,7 @@ function applyWebsiteName(name) {
   document.querySelectorAll(".auth-logo-title, .side-menu-logo").forEach((el) => {
     el.textContent = finalName;
   });
-  document.title = `${finalName} | Cross-Platform PWA App Store`;
+  refreshRouteMeta();
 }
 
 function applyLogo(url) {
@@ -178,6 +577,11 @@ function getSavedWebsiteName() {
   }
 }
 
+function onAppsUpdated() {
+  rebuildSlugIndex();
+  refreshPendingDetailRoute();
+}
+
 function hydrateFromCache() {
   const settings = getCachedSettings();
   applyWebsiteName(getSavedWebsiteName() || settings.websiteName || DEFAULT_WEBSITE_NAME);
@@ -186,7 +590,8 @@ function hydrateFromCache() {
   const cachedApps = getCachedApps();
   if (cachedApps.length) {
     allApps = cachedApps;
-    renderApps(applyAppFilters());
+    onAppsUpdated();
+    renderApps(filterForCurrentViews());
   }
 
   hydrateAdsFromCache();
@@ -196,7 +601,9 @@ function updateConnectionState() {
   const online = navigator.onLine;
   const pill = $("networkPill");
   if (pill) {
-    pill.className = `network-pill ${online ? "online" : "offline"}`;
+    // Only surfaced when offline: a permanent floating pill steals clicks
+    // from content near the bottom-left corner (e.g. the download button).
+    pill.className = `network-pill ${online ? "online hidden" : "offline"}`;
     pill.textContent = online ? "Online • synced" : "Offline • cached mode";
   }
 }
@@ -258,7 +665,7 @@ async function triggerInstallPrompt() {
     deferredInstallPrompt.prompt();
     const choice = await deferredInstallPrompt.userChoice;
     if (choice.outcome === "accepted") {
-      toast("Thanks for installing SamWeb Store!", "success");
+      toast(`Thanks for installing ${getSiteName()}!`, "success");
       sessionStorage.setItem(CACHE_KEYS.installDismissed, "1");
     } else {
       toast("Installation was dismissed.", "info");
@@ -284,7 +691,7 @@ window.triggerInstallPrompt = triggerInstallPrompt;
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
-  navigator.serviceWorker.register("./service-worker.js", { scope: "./" }).catch((err) => {
+  navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).catch((err) => {
     console.warn("Service worker registration failed:", err);
   });
 }
@@ -300,28 +707,25 @@ function showPage(id) {
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (id === "homePage") loadApps();
   renderAds();
-  if (id === "searchPage") {
-    setTimeout(() => {
-      const input = $("searchPageInput");
-      if (input) input.focus();
-    }, 80);
-  }
 }
 window.showPage = showPage;
 
 function closeAppDetailPage() {
-  showPage(lastPageId || "homePage");
+  if (window.history.state && window.history.state.sws) {
+    window.history.back();
+  } else {
+    navigate(lastNonDetailPath || PAGE_PATHS[lastPageId] || "/");
+  }
 }
 window.closeAppDetailPage = closeAppDetailPage;
 
 function goHome() {
-  showPage("homePage");
-  scrollToTop();
+  navigate("/");
 }
 window.goHome = goHome;
 
 function openSearch() {
-  showPage("searchPage");
+  navigate("/search");
 }
 window.openSearch = openSearch;
 
@@ -354,7 +758,7 @@ function renderSearchResults() {
   if (countEl) countEl.textContent = results.length === 1 ? "1 result found" : `${results.length} results found`;
 
   wrap.innerHTML = results.length
-    ? results.map(appRowHtml).join("")
+    ? results.map(cardHtmlFor).join("")
     : `<div class="empty-state">No apps found for "${escapeHtml(q)}".</div>`;
 }
 window.renderSearchResults = renderSearchResults;
@@ -391,10 +795,16 @@ function scrollToTop() {
 window.scrollToTop = scrollToTop;
 
 function navigateToSection(sectionId) {
-  if (!$("homePage")?.classList.contains("active")) showPage("homePage");
-  setTimeout(() => {
-    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, 60);
+  const go = () => {
+    setTimeout(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  };
+  if (currentRoute.kind !== "page" || currentRoute.pageId !== "homePage") {
+    navigate(`/#${sectionId}`);
+  } else {
+    go();
+  }
 }
 window.navigateToSection = navigateToSection;
 
@@ -482,13 +892,13 @@ function buildSideMenu() {
   footer.innerHTML = "";
 
   const items = [
-    { label: "Home", icon: "🏠", action: () => showPage("homePage") },
-    { label: "Games", icon: "🎮", action: () => showPage("gamesPage") },
-    { label: "App", icon: "📱", action: () => showPage("appsPage") },
-    { label: "FAQ", icon: "❓", action: () => showPage("faqPage") },
-    { label: "Disclaimer", icon: "⚠️", action: () => showPage("disclaimerPage") },
-    { label: "Terms of Use", icon: "📄", action: () => showPage("termsPage") },
-    { label: "Privacy Policy", icon: "🔒", action: () => showPage("privacyPage") },
+    { label: "Home", icon: "🏠", path: "/" },
+    { label: "Games", icon: "🎮", path: "/games" },
+    { label: "Apps", icon: "📱", path: "/apps" },
+    { label: "FAQ", icon: "❓", path: "/faq" },
+    { label: "Disclaimer", icon: "⚠️", path: "/disclaimer" },
+    { label: "Terms of Use", icon: "📄", path: "/terms" },
+    { label: "Privacy Policy", icon: "🔒", path: "/privacy" },
     { label: "Report Us", icon: "📣", action: openReport },
     { label: "About", icon: "ℹ️", action: openAbout },
     { label: getSavedTheme() === "dark" ? "Switch to Light" : "Switch to Dark", icon: getSavedTheme() === "dark" ? "☀️" : "🌙", action: toggleTheme }
@@ -499,7 +909,8 @@ function buildSideMenu() {
     btn.className = "nav-item";
     btn.innerHTML = `<span class="nav-icon">${item.icon}</span>${item.label}`;
     btn.onclick = () => {
-      item.action();
+      if (item.path) navigate(item.path);
+      else if (item.action) item.action();
       closeMenu();
     };
     nav.appendChild(btn);
@@ -538,8 +949,17 @@ function switchAuth(tab) {
   $("loginForm")?.classList.toggle("active", tab === "login");
   $("signupForm")?.classList.toggle("active", tab === "signup");
   $("signupError")?.classList.remove("show");
+  if (tab === "signup") preselectSignupSource();
 }
 window.switchAuth = switchAuth;
+
+/** Preselects "How did you hear about us?" from detected attribution — user can always change it. */
+function preselectSignupSource() {
+  const select = $("signSource");
+  if (!select) return;
+  const suggested = getSuggestedSignupOption();
+  if (suggested) select.value = suggested;
+}
 
 function selectGender(gender, el) {
   selectedGender = gender;
@@ -573,7 +993,12 @@ async function doLogin() {
       if (found) {
         saveSession(found);
         toast(`Welcome back, ${found.name || "User"}! 🎉`, "success");
-        showPage("homePage");
+        // Return to where the user was (e.g. an app page they wanted to review)
+        if (currentRoute.kind === "detail" || currentRoute.kind === "notfound") {
+          rerenderCurrentDetail();
+        } else {
+          navigate(lastNonDetailPath && lastNonDetailPath !== "/" ? lastNonDetailPath : "/");
+        }
       } else {
         toast("Invalid credentials!", "error");
       }
@@ -592,6 +1017,7 @@ async function doSignup() {
   const phone = $("signPhone")?.value.trim();
   const pass = $("signPass")?.value;
   const errorDiv = $("signupError");
+  const sourceAnswer = $("signSource")?.value || "";
 
   if (errorDiv) {
     errorDiv.innerHTML = "";
@@ -617,6 +1043,15 @@ async function doSignup() {
   if (!firebaseReady) {
     toast("Connecting to database...", "info");
     return;
+  }
+
+  // Attribution is non-critical analytics: getSignupAcquisition never throws,
+  // and even if it somehow did, signup continues with a safe fallback.
+  let acquisition;
+  try {
+    acquisition = getSignupAcquisition(sourceAnswer);
+  } catch {
+    acquisition = null;
   }
 
   try {
@@ -648,11 +1083,29 @@ async function doSignup() {
     }
 
     const newRef = window._push(window._ref(window._db, "users"));
-    const userData = { name, email, number: phone, password: pass, gender: selectedGender };
+    const now = Date.now();
+    const userData = {
+      name,
+      email,
+      number: phone,
+      password: pass,
+      gender: selectedGender,
+      createdAt: now
+    };
+    if (acquisition) {
+      userData.acquisition = acquisition;
+      // Denormalized mirror of acquisition.signup — never changed after registration.
+      userData.signupSource = acquisition.signup.source;
+      userData.signupCampaign = acquisition.signup.campaign || "";
+    }
     await window._set(newRef, userData);
     saveSession({ ...userData, key: newRef.key });
     toast(`Account created! Welcome ${name} 🎉`, "success");
-    showPage("homePage");
+    if (currentRoute.kind === "detail" || currentRoute.kind === "notfound") {
+      rerenderCurrentDetail();
+    } else {
+      navigate(lastNonDetailPath && lastNonDetailPath !== "/" ? lastNonDetailPath : "/");
+    }
   } catch (e) {
     if (errorDiv) {
       errorDiv.innerHTML = `❌ Error: ${e.message}`;
@@ -665,7 +1118,11 @@ window.doSignup = doSignup;
 function doLogout() {
   clearSession();
   toast("Logged out successfully", "success");
-  showPage("homePage");
+  if (currentRoute.kind === "detail" || currentRoute.kind === "notfound") {
+    rerenderCurrentDetail();
+  } else {
+    navigate("/");
+  }
   setTimeout(recordVisit, 500);
 }
 window.doLogout = doLogout;
@@ -1088,25 +1545,11 @@ function subscribeAds() {
   );
 }
 
-function getAverageRating(app) {
-  if (!app.reviews || Object.keys(app.reviews).length === 0) return Number(app.rating || 4.5);
-  let total = 0;
-  let count = 0;
-  for (const key in app.reviews) {
-    if (app.reviews[key] && app.reviews[key].rating) {
-      total += app.reviews[key].rating;
-      count += 1;
-    }
-  }
-  if (count === 0) return Number(app.rating || 4.5);
-  return Number((total / count).toFixed(1));
-}
-
-function getCardIconHtml(app, shellClass = "app-icon-shell") {
+function getCardIconHtml(app, shellClass = "app-icon-shell", extraAttrs = "") {
   if (app.imageUrl && app.imageUrl.startsWith("http")) {
     return `
       <div class="${shellClass}">
-        <img src="${escapeHtml(app.imageUrl)}" alt="${escapeHtml(app.name || "App")} icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';">
+        <img src="${escapeHtml(app.imageUrl)}" alt="${escapeHtml(app.name || "App")} icon" ${extraAttrs} onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';">
         <span style="display:none">${escapeHtml(app.icon || "📱")}</span>
       </div>
     `;
@@ -1114,22 +1557,31 @@ function getCardIconHtml(app, shellClass = "app-icon-shell") {
   return `<div class="${shellClass}"><span>${escapeHtml(app.icon || "📱")}</span></div>`;
 }
 
+function ratingLabel(app) {
+  const avg = getAverageRating(app);
+  return avg === null ? "New" : `★ ${avg}`;
+}
+
 function getFeaturedApps(source = allApps) {
   return [...source]
     .sort((a, b) => {
       const dl = (b.downloads || 0) - (a.downloads || 0);
       if (dl !== 0) return dl;
-      return getAverageRating(b) - getAverageRating(a);
+      return (getAverageRating(b) || 0) - (getAverageRating(a) || 0);
     })
     .slice(0, 4);
+}
+
+function getLatestApps(source = allApps, limit = 6) {
+  // Firebase push keys are chronological → newest records sort last.
+  return [...source].sort((a, b) => String(b.key).localeCompare(String(a.key))).slice(0, limit);
 }
 
 function updateHeroMetrics(source = allApps) {
   const totalApps = source.length;
   const totalDownloads = source.reduce((sum, app) => sum + (Number(app.downloads) || 0), 0);
-  const totalRatings = source.length
-    ? (source.reduce((sum, app) => sum + getAverageRating(app), 0) / source.length).toFixed(1)
-    : "0.0";
+  const rated = source.map((app) => getAverageRating(app)).filter((v) => v !== null);
+  const totalRatings = rated.length ? (rated.reduce((sum, v) => sum + v, 0) / rated.length).toFixed(1) : "—";
 
   if ($("heroAppsCount")) $("heroAppsCount").textContent = formatNum(totalApps);
   if ($("heroDownloadsCount")) $("heroDownloadsCount").textContent = formatNum(totalDownloads);
@@ -1199,28 +1651,34 @@ function renderHeroBanner(source = allApps) {
     return;
   }
 
-  const slideHtml = (app, i) => `
+  const slideHtml = (app, i) => {
+    const path = getAppPath(app, slugIndex);
+    const hasLink = typeof app.link === "string" && /^https?:\/\//i.test(app.link);
+    return `
     <div class="banner-slide ${i === 0 ? "active" : ""}">
       <div class="banner-copy">
         <span class="banner-badge">🔥 Featured App</span>
         <h2 class="banner-title">${escapeHtml(app.name)}</h2>
         <div class="banner-meta">
-          <span>★ ${getAverageRating(app)}</span>
+          <span>${ratingLabel(app)}</span>
           <span>${formatNum(app.downloads || 0)} downloads</span>
           <span>${escapeHtml(app.category || "App")}</span>
         </div>
         <p class="banner-desc">${escapeHtml((app.description || "Discover and download this app now.").slice(0, 150))}</p>
-        <button class="btn btn-ghost btn-sm" onclick='openAppDetail(${toJsString(app.key)})'>Details</button>
+        <a class="btn btn-ghost btn-sm" href="${escapeHtml(path)}" data-nav>Details</a>
       </div>
       <div class="banner-side">
         <div class="banner-icon-shell">
           ${app.imageUrl && app.imageUrl.startsWith("http")
-            ? `<img src="${escapeHtml(app.imageUrl)}" alt="${escapeHtml(app.name)} icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"><span style="display:none">${escapeHtml(app.icon || "📱")}</span>`
+            ? `<img src="${escapeHtml(app.imageUrl)}" alt="${escapeHtml(app.name)} icon" width="64" height="64" loading="lazy" decoding="async" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"><span style="display:none">${escapeHtml(app.icon || "📱")}</span>`
             : `<span>${escapeHtml(app.icon || "📱")}</span>`}
         </div>
-        <button class="btn btn-primary" onclick='downloadApp(${toJsString(app.key)}, ${toJsString(app.link || "")})'>Download</button>
+        ${hasLink
+          ? `<a class="btn btn-primary" href="${escapeHtml(app.link)}" target="_blank" rel="noopener" onclick='return handleDownloadClick(event, ${toJsString(app.key)}, ${toJsString(app.link)})'>Download</a>`
+          : `<button class="btn btn-primary" disabled>Download</button>`}
       </div>
     </div>`;
+  };
 
   banner.classList.remove("hidden");
   banner.innerHTML = `
@@ -1238,17 +1696,26 @@ function renderHeroBanner(source = allApps) {
   if (apps.length > 1) startBannerTimer();
 }
 
-function renderCategoryFilters(source = allApps) {
-  const wrap = $("categoryFilters");
-  if (!wrap) return;
-
+function buildChipsHtml(containerPageKey, source) {
+  const active = categoryFilter[containerPageKey] || "All";
   const categories = ["All", ...new Set(source.map((app) => app.category || "Other"))];
-  wrap.innerHTML = categories
+  return categories
     .map((category) => {
       const count = category === "All" ? source.length : source.filter((app) => (app.category || "Other") === category).length;
-      return `<button class="category-chip ${activeCategory === category ? "active" : ""}" onclick='setCategoryFilter(${toJsString(category)})'>${escapeHtml(category)} <span style="opacity:.75">(${count})</span></button>`;
+      return `<button class="category-chip ${active === category ? "active" : ""}" onclick='setCategoryFilter(${toJsString(containerPageKey)}, ${toJsString(category)})'>${escapeHtml(category)} <span style="opacity:.75">(${count})</span></button>`;
     })
     .join("");
+}
+
+function renderCategoryFilters(source = allApps) {
+  const homeWrap = $("categoryFilters");
+  if (homeWrap) homeWrap.innerHTML = buildChipsHtml("home", source);
+
+  const appsWrap = $("appsCategoryFilters");
+  if (appsWrap) appsWrap.innerHTML = source.some((a) => !isGameApp(a)) ? buildChipsHtml("apps", source.filter((a) => !isGameApp(a))) : "";
+
+  const gamesWrap = $("gamesCategoryFilters");
+  if (gamesWrap) gamesWrap.innerHTML = source.some(isGameApp) ? buildChipsHtml("games", source.filter(isGameApp)) : "";
 }
 
 function renderFeaturedGrid(source = allApps) {
@@ -1262,10 +1729,12 @@ function renderFeaturedGrid(source = allApps) {
   }
 
   grid.innerHTML = featured
-    .map((app) => `
-      <article class="featured-card" onclick='openAppDetail(${toJsString(app.key)})'>
+    .map((app) => {
+      const path = getAppPath(app, slugIndex);
+      return `
+      <a class="featured-card" href="${escapeHtml(path)}" data-nav aria-label="${escapeHtml(app.name || "App")} — view details">
         <div class="featured-top">
-          ${getCardIconHtml(app, "featured-icon")}
+          ${getCardIconHtml(app, "featured-icon", 'width="44" height="44" loading="lazy" decoding="async"')}
           <span class="chip">${escapeHtml(app.category || "App")}</span>
         </div>
         <div class="featured-copy">
@@ -1273,159 +1742,179 @@ function renderFeaturedGrid(source = allApps) {
           <p class="featured-desc">${escapeHtml((app.description || "No description available.").slice(0, 120))}${(app.description || "").length > 120 ? "…" : ""}</p>
         </div>
         <div class="featured-meta">
-          <span>★ ${getAverageRating(app)}</span>
+          <span>${ratingLabel(app)}</span>
           <span>${formatNum(app.downloads || 0)} downloads</span>
         </div>
-      </article>
-    `)
+      </a>`;
+    })
     .join("");
 }
 
-function applyAppFilters(source = allApps) {
-  return source.filter((app) => {
-    const category = app.category || "Other";
-    return activeCategory === "All" || category === activeCategory;
-  });
+function renderLatestGrid(source = allApps) {
+  const grid = $("latestGrid");
+  const section = $("latestSection");
+  if (!grid || !section) return;
+  const latest = getLatestApps(source, 6);
+  section.classList.toggle("hidden", !latest.length);
+  grid.innerHTML = latest.map(cardHtmlFor).join("");
 }
 
-function appRowHtml(app) {
-  return `
-    <article class="app-card" onclick='openAppDetail(${toJsString(app.key)})'>
-      <div class="app-card-head">
-        ${getCardIconHtml(app)}
-        <div class="app-card-titles">
-          <h3 class="app-name">${escapeHtml(app.name)}</h3>
-          <div class="app-category">${escapeHtml(app.category || "App")}</div>
-        </div>
-      </div>
-      <div class="app-rating">
-        <span>★ ${getAverageRating(app)}</span>
-        <span>${formatNum(app.downloads || 0)} downloads</span>
-      </div>
-      <p class="app-desc-snippet">${escapeHtml((app.description || "No description available.").slice(0, 110))}${(app.description || "").length > 110 ? "…" : ""}</p>
-      <span class="app-download-btn">Download</span>
-    </article>
-  `;
+function matchesCategory(app, category) {
+  return category === "All" || (app.category || "Other") === category;
+}
+
+function filterForCurrentViews() {
+  return allApps.filter((app) => matchesCategory(app, categoryFilter.home));
 }
 
 function renderApps(apps) {
+  const grid = $("appsGrid");
+  const count = $("appCount");
+
   updateHeroMetrics(allApps);
   renderHeroBanner(allApps);
   renderCategoryFilters(allApps);
   renderFeaturedGrid(allApps);
+  renderLatestGrid(allApps);
 
-  const grid = $("appsGrid");
-  const count = $("appCount");
-  if (!grid) return;
+  if (grid) {
+    if (count) {
+      count.textContent = allApps.length
+        ? apps.length === allApps.length
+          ? `${apps.length} apps available`
+          : `Showing ${apps.length} of ${allApps.length} apps`
+        : "0 apps available";
+    }
 
-  if (count) {
-    count.textContent = allApps.length
-      ? apps.length === allApps.length
-        ? `${apps.length} apps available`
-        : `Showing ${apps.length} of ${allApps.length} apps`
-      : "0 apps available";
+    if (!allApps.length) {
+      grid.innerHTML = '<div class="empty-state">No apps yet. Admin can add some anytime.</div>';
+    } else if (!apps.length) {
+      grid.innerHTML = '<div class="empty-state">No apps match your search or selected category.</div>';
+    } else {
+      grid.innerHTML = apps.map(cardHtmlFor).join("");
+    }
   }
 
-  if (!allApps.length) {
-    grid.innerHTML = '<div class="empty-state">No apps yet. Admin can add some anytime.</div>';
-    return;
-  }
-
-  if (!apps.length) {
-    grid.innerHTML = '<div class="empty-state">No apps match your search or selected category.</div>';
-    return;
-  }
-
-  grid.innerHTML = apps.map(appRowHtml).join("");
   renderGamesAppsPages();
   renderPopularSearches();
-  renderSearchResults();
+  if ($("searchPage")?.classList.contains("active")) renderSearchResults();
 }
 
-function isGameApp(app) {
-  return ((app.category || "").toLowerCase().includes("game"));
+// Debounced re-render so rapid Firebase updates don't thrash the DOM.
+let appsRenderScheduled = false;
+function scheduleAppsRender() {
+  if (appsRenderScheduled) return;
+  appsRenderScheduled = true;
+  setTimeout(() => {
+    appsRenderScheduled = false;
+    renderApps(filterForCurrentViews());
+  }, 120);
 }
 
 function renderGamesAppsPages() {
   const gamesGrid = $("gamesGrid");
   if (gamesGrid) {
-    const games = allApps.filter(isGameApp);
+    const games = allApps.filter(isGameApp).filter((a) => matchesCategory(a, categoryFilter.games));
     const gamesCount = $("gamesCount");
     if (gamesCount) gamesCount.textContent = games.length ? `${games.length} games available` : "";
     gamesGrid.innerHTML = games.length
-      ? games.map(appRowHtml).join("")
+      ? games.map(cardHtmlFor).join("")
       : '<div class="empty-state">No games yet. Admin can add some anytime.</div>';
   }
 
   const appsPageGrid = $("appsPageGrid");
   if (appsPageGrid) {
-    const apps = allApps.filter((app) => !isGameApp(app));
+    const apps = allApps.filter((app) => !isGameApp(app)).filter((a) => matchesCategory(a, categoryFilter.apps));
     const appsPageCount = $("appsPageCount");
     if (appsPageCount) appsPageCount.textContent = apps.length ? `${apps.length} apps available` : "";
     appsPageGrid.innerHTML = apps.length
-      ? apps.map(appRowHtml).join("")
+      ? apps.map(cardHtmlFor).join("")
       : '<div class="empty-state">No apps yet. Admin can add some anytime.</div>';
   }
 }
 
 function loadApps() {
-  if (allApps.length) renderApps(applyAppFilters());
+  if (allApps.length) renderApps(filterForCurrentViews());
 
   if (!firebaseReady) {
     if (!allApps.length) {
       const cached = getCachedApps();
       if (cached.length) {
         allApps = cached;
-        renderApps(applyAppFilters());
+        onAppsUpdated();
+        renderApps(filterForCurrentViews());
       }
     }
     return;
   }
 
   if (appsSubscribed) {
-    renderApps(applyAppFilters());
+    renderApps(filterForCurrentViews());
     return;
   }
 
   const grid = $("appsGrid");
-  if (grid && !allApps.length) grid.innerHTML = '<div class="spinner"></div>';
+  if (grid && !allApps.length && $("homePage")?.classList.contains("active")) grid.innerHTML = '<div class="spinner"></div>';
 
   appsSubscribed = true;
   window._onValue(
     window._ref(window._db, "apps"),
     (snap) => {
       allApps = [];
+      appsLoadFailed = false;
       if (snap.exists()) {
         snap.forEach((child) => {
           allApps.push({ key: child.key, ...child.val() });
         });
       }
       cacheApps(allApps);
-      renderApps(applyAppFilters());
+      onAppsUpdated();
+      scheduleAppsRender();
+      // A detail route may still be waiting for the catalog (or need a re-render with live data)
+      if (currentRoute.kind === "detail" && currentAppId) {
+        const app = allApps.find((a) => a.key === currentAppId);
+        if (app) rerenderCurrentDetail({ keepScroll: true });
+        else renderDetailNotFound(currentRoute.path.split("/")[2] || "", currentRoute.path.split("/")[1] || "app");
+      }
     },
     (error) => {
       appsSubscribed = false;
+      appsLoadFailed = true;
       console.error("Apps subscription error:", error);
       const cached = getCachedApps();
       if (cached.length) {
         allApps = cached;
-        renderApps(applyAppFilters());
+        onAppsUpdated();
+        scheduleAppsRender();
         toast("Showing cached apps while live sync is unavailable.", "info", 3600);
       } else {
         if (grid) grid.innerHTML = '<div class="empty-state">Unable to load apps right now.</div>';
+        refreshPendingDetailRoute();
+        if (pendingDetailRoute) {
+          const { slug, typeHint } = pendingDetailRoute;
+          pendingDetailRoute = null;
+          renderDetailNotFound(slug, typeHint, true);
+        }
       }
     }
   );
 }
 
 function filterApps() {
-  renderApps(applyAppFilters());
+  renderApps(filterForCurrentViews());
 }
 window.filterApps = filterApps;
 
-function setCategoryFilter(category) {
-  activeCategory = category;
-  renderApps(applyAppFilters());
+function setCategoryFilter(pageKey, category) {
+  // Backward-compatible single-arg form (old inline handlers / console)
+  if (category === undefined) {
+    category = pageKey;
+    pageKey = currentRoute.kind === "page" && currentRoute.pageId === "appsPage" ? "apps" : currentRoute.kind === "page" && currentRoute.pageId === "gamesPage" ? "games" : "home";
+  }
+  categoryFilter[pageKey] = category;
+  renderApps(filterForCurrentViews());
+  renderGamesAppsPages();
+  renderCategoryFilters(allApps);
 }
 window.setCategoryFilter = setCategoryFilter;
 
@@ -1447,128 +1936,77 @@ async function addAutoReport(appName, userName, rating, comment) {
   }
 }
 
-function openAppDetail(key) {
-  const app = allApps.find((item) => item.key === key);
+// ============ APP DETAIL (shared renderer + dynamic SEO) ============
+
+function rerenderCurrentDetail(opts = {}) {
+  if (!currentAppId) return;
+  const app = allApps.find((a) => a.key === currentAppId);
   if (!app) return;
+  const scrollY = opts.keepScroll ? window.scrollY : null;
+  openAppDetail(currentAppId, { fromRoute: true, keepScroll: opts.keepScroll });
+  if (scrollY !== null) window.scrollTo({ top: scrollY });
+}
+
+function openAppDetail(key, opts = {}) {
+  const app = allApps.find((item) => item.key === key);
+  if (!app) {
+    if (!opts.fromRoute) navigate("/apps");
+    return;
+  }
 
   currentAppId = key;
-  const avgRating = getAverageRating(app);
-  const reviews = app.reviews || {};
-  const appName = app.name || "App";
+  pendingDetailRoute = null;
+  if (pendingDetailTimer) {
+    clearTimeout(pendingDetailTimer);
+    pendingDetailTimer = null;
+  }
 
-  let userExistingReview = null;
-  let userExistingRating = 0;
+  let userReview = null;
   if (currentUser && currentUser.key) {
-    for (const rid in reviews) {
-      if (reviews[rid] && reviews[rid].userId === currentUser.key) {
-        userExistingReview = reviews[rid];
-        userExistingRating = reviews[rid].rating;
-        break;
-      }
-    }
+    userReview = getReviewList(app).find((r) => r.userId === currentUser.key) || null;
+  }
+  selectedRatingValue = userReview ? Number(userReview.rating) || 0 : 0;
+
+  // Android host integration: /app/slug?pkg=com.example.app&vc=10
+  if (!opts.fromRoute || opts.installedVc !== undefined) {
+    detailInstallContext = { pkg: opts.installedPkg || null, vc: opts.installedVc || null };
+  }
+  let installedVersionCode = null;
+  if (detailInstallContext.vc !== null && detailInstallContext.vc !== undefined) {
+    const vc = Number(detailInstallContext.vc);
+    const pkgMatches = !app.packageName || !detailInstallContext.pkg || app.packageName === detailInstallContext.pkg;
+    if (Number.isFinite(vc) && pkgMatches) installedVersionCode = vc;
   }
 
-  selectedRatingValue = userExistingRating;
-
-  const reviewItems = Object.keys(reviews)
-    .map((rid) => ({ id: rid, ...reviews[rid] }))
-    .filter(Boolean)
-    .sort((a, b) => (b.date || 0) - (a.date || 0));
-
-  let reviewsHtml = "";
-  if (!reviewItems.length) {
-    reviewsHtml = '<div class="empty-state" style="min-height:auto">No reviews yet. Be the first to review!</div>';
-  } else {
-    reviewsHtml = reviewItems
-      .map(
-        (r) => `
-          <div class="review-item">
-            <div class="review-user">${escapeHtml(r.username || "Anonymous")}</div>
-            <div class="review-rating">${"★".repeat(r.rating || 0)}${"☆".repeat(5 - (r.rating || 0))}</div>
-            <div class="review-text">${escapeHtml(r.comment || "")}</div>
-            <div class="review-date">${new Date(r.date || Date.now()).toLocaleDateString()}</div>
-          </div>
-        `
-      )
-      .join("");
-  }
-
-  const screenshots = [app.screenshot1, app.screenshot2, app.screenshot3, app.screenshot4, app.screenshot5].filter(Boolean);
-  const screenshotsHtml = screenshots.length
-    ? `
-      <div class="screenshots-section">
-        <div class="screenshots-label">App Screenshots</div>
-        <div class="screenshots-scroll">
-          ${screenshots
-            .map(
-              (url, i) => `<img src="${escapeHtml(url)}" class="screenshot-thumb" alt="Screenshot ${i + 1}" onclick='openScreenshot(${toJsString(url)})' onerror="this.style.display='none'">`
-            )
-            .join("")}
-        </div>
-      </div>
-    `
-    : "";
-
-  const starsHtml = [1, 2, 3, 4, 5]
-    .map((v) => `<span class="star ${userExistingRating >= v ? "active" : ""}" onclick='setRating(${v})'>★</span>`)
-    .join("");
+  const vm = buildAppViewModel(app, {
+    allApps,
+    slugIndex,
+    siteName: getSiteName(),
+    origin: SITE_ORIGIN,
+    isLoggedIn: !!currentUser,
+    userReview,
+    installedVersionCode
+  });
+  detailVm = vm;
 
   const content = $("appDetailPageContent");
   if (!content) return;
+  content.innerHTML = renderAppDetailInner(vm);
 
-  content.innerHTML = `
-    <div class="app-detail-layout">
-      <div class="app-detail-hero">
-        ${getCardIconHtml(app, "detail-icon-shell")}
-        <div>
-          <span class="chip">${escapeHtml(app.category || "App")}</span>
-          <h2 class="app-detail-name">${escapeHtml(app.name)}</h2>
-          <div class="app-detail-subline">Install on your favorite device and keep this listing within reach.</div>
-          <div class="app-stats">
-            <div class="app-stat"><span class="app-stat-value">★ ${avgRating}</span><span class="app-stat-label">Average Rating</span></div>
-            <div class="app-stat"><span class="app-stat-value">${formatNum(app.downloads || 0)}</span><span class="app-stat-label">Downloads</span></div>
-            <div class="app-stat"><span class="app-stat-value">${reviewItems.length}</span><span class="app-stat-label">Reviews</span></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="app-desc">${escapeHtml(app.description || "No description available.")}</div>
-
-      <div class="detail-actions">
-        <button class="btn btn-primary" onclick='downloadApp(${toJsString(app.key)}, ${toJsString(app.link || "")})'>Download Now</button>
-        <button class="btn btn-ghost" onclick="openReport()">Need help?</button>
-      </div>
-      <div class="detail-note">${currentUser ? "You can rate and download instantly with your logged-in account." : "Login is required before downloading or reviewing apps."}</div>
-
-      ${screenshotsHtml}
-
-      <div class="rating-section">
-        <div class="section-block-title">Rate this App</div>
-        <div class="stars">${starsHtml}</div>
-        <div class="input-group" style="margin-top:12px;">
-          <label for="reviewText">Write a Review</label>
-          <textarea id="reviewText" rows="3" placeholder="Share your experience...">${userExistingReview ? escapeHtml(userExistingReview.comment || "") : ""}</textarea>
-        </div>
-        <button class="btn btn-outline btn-sm" onclick='submitReview(${toJsString(appName)})'>📝 Submit Review</button>
-
-        <div style="margin-top:20px;">
-          <div class="section-block-title">User Reviews</div>
-          <div class="reviews-list">${reviewsHtml}</div>
-        </div>
-      </div>
-
-      <div class="ad-slot hidden" data-ad-slot="detail_bottom"></div>
-    </div>
-  `;
-
+  currentRoute = { kind: "detail", key, path: vm.path };
   showPage("appDetailPage");
+  applyDetailMeta(vm);
 }
-window.openAppDetail = openAppDetail;
+// Legacy entry point → routes through the public URL so links stay shareable.
+window.openAppDetail = (key) => {
+  const app = allApps.find((a) => a.key === key);
+  if (app) navigate(getAppPath(app, slugIndex));
+};
 
 function openScreenshot(url) {
   const lb = document.createElement("div");
   lb.className = "screenshot-lightbox";
-  lb.innerHTML = `<button class="screenshot-lightbox-close" onclick="this.parentElement.remove()">✕</button><img src="${escapeHtml(url)}" alt="Screenshot">`;
+  lb.innerHTML = `<button class="screenshot-lightbox-close" aria-label="Close screenshot" onclick="this.parentElement.remove()">✕</button><img src="${escapeHtml(url)}" alt="Enlarged screenshot">`;
   lb.onclick = (e) => {
     if (e.target === lb) lb.remove();
   };
@@ -1587,7 +2025,8 @@ window.setRating = setRating;
 
 async function submitReview(appName) {
   if (!currentUser) {
-    toast("Please login to review!", "error");
+    toast("Please login to review — downloads stay open to everyone!", "error");
+    showPage("authPage");
     return;
   }
   if (!selectedRatingValue) {
@@ -1633,32 +2072,57 @@ async function submitReview(appName) {
 
     await addAutoReport(appName, currentUser.name, selectedRatingValue, comment);
     if ($("reviewText")) $("reviewText").value = "";
-    openAppDetail(currentAppId);
     loadApps();
+    rerenderCurrentDetail({ keepScroll: true });
   } catch (e) {
     toast(`Error: ${e.message}`, "error");
   }
 }
 window.submitReview = submitReview;
 
-async function downloadApp(key, link) {
-  if (!currentUser) {
-    showPage("authPage");
-    toast("Please login to download!", "error");
-    return;
-  }
+// ============ DOWNLOADS — open to guests (no login) ============
 
+async function incrementDownloadCounter(key) {
   try {
     const appRef = window._ref(window._db, `apps/${key}`);
     await window._runTransaction(appRef, (currentData) => {
       if (currentData) currentData.downloads = (currentData.downloads || 0) + 1;
       return currentData;
     });
-    toast("Download started! 🚀", "success");
-    if (link && link.startsWith("http")) window.open(link, "_blank");
-  } catch {
-    toast("Error updating downloads", "error");
+  } catch (e) {
+    console.warn("Download counter update failed:", e);
   }
+}
+
+/**
+ * Anchor click handler for download links: validates the URL, keeps the
+ * existing counter, and lets the browser open the file. Guests included —
+ * downloading never requires login.
+ */
+function handleDownloadClick(event, key, link) {
+  if (event && (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) {
+    return true; // modifier/middle clicks: just open, still count below
+  }
+  if (!link || !/^https?:\/\//i.test(String(link))) {
+    if (event) event.preventDefault();
+    toast("This download link is not available yet.", "error");
+    return false;
+  }
+  incrementDownloadCounter(key);
+  toast("Download started! 🚀", "success");
+  return true; // allow the anchor's default navigation
+}
+window.handleDownloadClick = handleDownloadClick;
+
+/** Legacy programmatic download (kept for compatibility) — guests allowed. */
+function downloadApp(key, link) {
+  if (!link || !/^https?:\/\//i.test(String(link))) {
+    toast("This download link is not available yet.", "error");
+    return;
+  }
+  incrementDownloadCounter(key);
+  toast("Download started! 🚀", "success");
+  window.open(link, "_blank", "noopener");
 }
 window.downloadApp = downloadApp;
 
@@ -1668,6 +2132,13 @@ function closeModal(id) {
 window.closeModal = closeModal;
 
 function openReport() {
+  closeMenu();
+  if (!currentUser) {
+    // Reports are login-gated — never submitted anonymously.
+    toast("Please login to submit a report. Browsing and downloads stay open to everyone.", "info", 4200);
+    showPage("authPage");
+    return;
+  }
   $("reportOverlay")?.classList.remove("hidden");
 }
 window.openReport = openReport;
@@ -1678,6 +2149,12 @@ function closeReportM(e) {
 window.closeReportM = closeReportM;
 
 async function sendReport() {
+  if (!currentUser) {
+    closeModal("reportOverlay");
+    toast("Please login to submit a report.", "error");
+    showPage("authPage");
+    return;
+  }
   const sub = $("rSubject")?.value.trim();
   const msg = $("rMsg")?.value.trim();
   if (!sub || !msg) {
@@ -1692,8 +2169,9 @@ async function sendReport() {
   try {
     const newRef = window._push(window._ref(window._db, "reports"));
     await window._set(newRef, {
-      username: currentUser ? currentUser.name : "Anonymous",
-      email: currentUser ? currentUser.email || "" : "",
+      username: currentUser.name,
+      email: currentUser.email || "",
+      userId: currentUser.key || "",
       subject: sub,
       message: msg,
       timestamp: Date.now(),
@@ -1711,6 +2189,7 @@ async function sendReport() {
 window.sendReport = sendReport;
 
 function openAbout() {
+  closeMenu();
   $("aboutOverlay")?.classList.remove("hidden");
 }
 window.openAbout = openAbout;
@@ -1752,17 +2231,57 @@ function toggleTheme() {
 }
 window.toggleTheme = toggleTheme;
 
-function readSearchParam() {
-  try {
-    const q = new URLSearchParams(window.location.search).get("q");
-    if (q) {
-      const input = $("searchPageInput");
-      if (input) input.value = q;
-      showPage("searchPage");
-      renderSearchResults();
-    }
-  } catch {}
+// ============ APP UPDATE CHECKER (Android host bridge) ============
+// An Android wrapper/WebView can either:
+//   • open /app/{slug}?pkg=com.example.app&vc=10  → on-page update banner, or
+//   • call window.SayemWebStore.checkAppUpdate(packageName, installedVersionCode)
+// Rules: website versionCode > installed → update; equal → nothing;
+// lower → no false update; missing data → never crash, no prompt.
+let appsLoadedPromise = null;
+function ensureAppsLoaded() {
+  if (allApps.length) return Promise.resolve(allApps);
+  if (!appsLoadedPromise) {
+    appsLoadedPromise = new Promise((resolve) => {
+      if (!firebaseReady) {
+        resolve(allApps);
+        return;
+      }
+      window._get(window._ref(window._db, "apps")).then((snap) => {
+        if (!allApps.length && snap.exists()) {
+          snap.forEach((child) => allApps.push({ key: child.key, ...child.val() }));
+          onAppsUpdated();
+          scheduleAppsRender();
+        }
+        resolve(allApps);
+      }).catch(() => resolve(allApps));
+    });
+  }
+  return appsLoadedPromise;
 }
+
+window.SayemWebStore = {
+  version: "4.1.0",
+  async checkAppUpdate(packageName, installedVersionCode) {
+    try {
+      await ensureAppsLoaded();
+      const app = allApps.find((a) => a && a.packageName === packageName) || null;
+      if (!app) return { found: false, updateAvailable: false, reason: "not-listed" };
+      const status = resolveUpdateStatus(installedVersionCode, app.versionCode);
+      return {
+        found: true,
+        name: app.name || "",
+        url: `${SITE_ORIGIN}${getAppPath(app, slugIndex)}`,
+        latestVersionCode: app.versionCode ?? null,
+        latestVersionName: app.versionName || null,
+        downloadUrl: app.link || null,
+        updateAvailable: status.updateAvailable,
+        reason: status.reason
+      };
+    } catch {
+      return { found: false, updateAvailable: false, reason: "error" };
+    }
+  }
+};
 
 function setupGlobalEvents() {
   window.addEventListener("beforeinstallprompt", (event) => {
@@ -1776,7 +2295,7 @@ function setupGlobalEvents() {
     deferredInstallPrompt = null;
     sessionStorage.setItem(CACHE_KEYS.installDismissed, "1");
     updateInstallUI();
-    toast("SamWeb Store installed successfully!", "success");
+    toast(`${getSiteName()} installed successfully!`, "success");
   });
 
   window.addEventListener("online", () => {
@@ -1790,6 +2309,30 @@ function setupGlobalEvents() {
   window.addEventListener("offline", () => {
     updateConnectionState();
     toast("You are offline. Cached content is still available.", "info", 3600);
+  });
+
+  // Browser back/forward → re-apply the route
+  window.addEventListener("popstate", () => {
+    applyRouteFromLocation();
+  });
+
+  // Internal link handling (real <a href> for crawlers + keyboard users,
+  // intercepted for SPA navigation)
+  document.addEventListener("click", (event) => {
+    const authAnchor = event.target.closest && event.target.closest("a[data-auth-nav]");
+    if (authAnchor) {
+      event.preventDefault();
+      showPage("authPage");
+      switchAuth("login");
+      return;
+    }
+    const anchor = event.target.closest && event.target.closest("a[data-nav]");
+    if (!anchor) return;
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const href = anchor.getAttribute("href") || "";
+    if (!href || /^(https?:|mailto:|tel:)/i.test(href)) return;
+    event.preventDefault();
+    navigate(href);
   });
 
   document.addEventListener("keydown", (e) => {
@@ -1809,6 +2352,10 @@ function setupGlobalEvents() {
 }
 
 function initShell() {
+  // Attribution capture runs first: reads UTM/referrer, persists first/latest
+  // touch, and strips utm_* from the visible URL (canonical hygiene).
+  initAttribution();
+
   applyTheme(getSavedTheme(), false);
   hydrateFromCache();
   loadSession();
@@ -1816,7 +2363,9 @@ function initShell() {
   updateInstallUI();
   registerServiceWorker();
   setupGlobalEvents();
-  readSearchParam();
+
+  // Initial route from the real URL (/app/slug, /games, /search?q=… etc.)
+  applyRouteFromLocation();
 
   // Offline / slow-network fallback: release floating ads after a short wait
   setTimeout(() => {
