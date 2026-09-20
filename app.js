@@ -44,6 +44,7 @@ window._remove = remove;
 window._update = update;
 window._onValue = onValue;
 window._runTransaction = runTransaction;
+window._increment = increment;
 
 const DEFAULT_WEBSITE_NAME = SITE_NAME_DEFAULT; // "Sayem WebStore"
 const DEFAULT_LOGO = "icons/icon-192.png";
@@ -848,7 +849,6 @@ function saveSession(user) {
   localStorage.setItem("samweb_user", JSON.stringify(user));
   updateHeaderUser();
   buildSideMenu();
-  recordVisit();
 }
 
 function clearSession() {
@@ -1099,6 +1099,22 @@ async function doSignup() {
       userData.signupCampaign = acquisition.signup.campaign || "";
     }
     await window._set(newRef, userData);
+
+    // Aggregate daily signup counter per source (conversion analytics).
+    // Exactly one write per signup — never per pageview.
+    if (acquisition && acquisition.signup && window._increment) {
+      try {
+        const day = new Date(now).toISOString().slice(0, 10);
+        const sKey = String(acquisition.signup.source || "Unknown").replace(/[^A-Za-z0-9]+/g, "_").slice(0, 40) || "Unknown";
+        window._update(
+          window._ref(window._db, `analytics/daily/${day}/sources/${sKey}/signups`),
+          window._increment(1)
+        ).catch(() => {});
+      } catch {
+        /* analytics best-effort */
+      }
+    }
+
     saveSession({ ...userData, key: newRef.key });
     toast(`Account created! Welcome ${name} 🎉`, "success");
     if (currentRoute.kind === "detail" || currentRoute.kind === "notfound") {
@@ -1123,169 +1139,15 @@ function doLogout() {
   } else {
     navigate("/");
   }
-  setTimeout(recordVisit, 500);
 }
 window.doLogout = doLogout;
 
-function getDeviceToken() {
-  const KEY = "samweb_device_token_v2";
-  let token = localStorage.getItem(KEY);
-  if (!token) {
-    const rand = Math.random().toString(36).substr(2, 9);
-    const ts = Date.now().toString(36);
-    token = `dt_${rand}${ts}`;
-    localStorage.setItem(KEY, token);
-  }
-  return token;
-}
+// Per-device visit tracking (IP, user-agent, hardware, battery, linked account)
+// was removed: it collected identifying data and wrote on every visit.
+// Traffic insight now comes from the anonymous aggregate beacon in
+// attribution.js (sendVisitBeacon -> POST /api/visit), which sends at most one
+// cookie-free, identity-free event per browser session.
 
-function getDeviceInfo() {
-  const ua = navigator.userAgent;
-  let deviceName = "Unknown";
-  let deviceType = "desktop";
-  let browser = "Unknown";
-
-  if (/Android/i.test(ua)) {
-    const m = ua.match(/;\s([^;]+)\sBuild/);
-    deviceName = m ? m[1] : "Android";
-    deviceType = "mobile";
-  } else if (/iPhone|iPad|iPod/i.test(ua)) {
-    deviceName = "Apple Device";
-    deviceType = "mobile";
-  } else if (/Windows/i.test(ua)) {
-    deviceName = "Windows PC";
-  } else if (/Mac/i.test(ua)) {
-    deviceName = "Mac";
-  }
-
-  if (ua.includes("Firefox")) browser = "Firefox";
-  else if (ua.includes("Edg")) browser = "Edge";
-  else if (ua.includes("Chrome")) browser = "Chrome";
-  else if (ua.includes("Safari")) browser = "Safari";
-
-  return {
-    deviceName,
-    deviceType,
-    browser,
-    platform: navigator.platform || "Unknown",
-    language: navigator.language || "Unknown",
-    screen: `${window.screen.width}x${window.screen.height}`,
-    ram: navigator.deviceMemory ? `${navigator.deviceMemory} GB` : "Unknown",
-    cpuCores: navigator.hardwareConcurrency || "Unknown",
-    userAgent: ua
-  };
-}
-
-function getConnectionInfo() {
-  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  if (conn) {
-    return {
-      effectiveType: conn.effectiveType || "Unknown",
-      downlink: conn.downlink ? `${conn.downlink} Mbps` : "Unknown",
-      rtt: conn.rtt ? `${conn.rtt} ms` : "Unknown"
-    };
-  }
-  return { effectiveType: "Unknown", downlink: "Unknown", rtt: "Unknown" };
-}
-
-async function getBatteryInfo() {
-  try {
-    const bt = await navigator.getBattery();
-    return {
-      level: `${Math.round(bt.level * 100)}%`,
-      charging: bt.charging ? "⚡ Charging" : "🔋 Battery"
-    };
-  } catch {
-    return { level: "N/A", charging: "N/A" };
-  }
-}
-
-async function getIP() {
-  try {
-    const r = await fetch("https://api.ipify.org?format=json");
-    return (await r.json()).ip;
-  } catch {
-    return null;
-  }
-}
-
-async function recordVisit() {
-  if (!firebaseReady) {
-    setTimeout(recordVisit, 1000);
-    return;
-  }
-
-  try {
-    const deviceToken = getDeviceToken();
-    const di = getDeviceInfo();
-    const conn = getConnectionInfo();
-    const battery = await getBatteryInfo();
-    const ip = await getIP();
-    const now = Date.now();
-
-    const visitorRef = window._ref(window._db, `visitors/${deviceToken}`);
-    const snap = await window._get(visitorRef);
-    const existing = snap.exists() ? snap.val() : {};
-
-    const visitEntry = {
-      timestamp: now,
-      ip: ip || "N/A",
-      browser: di.browser,
-      platform: di.platform,
-      language: di.language,
-      screenResolution: di.screen,
-      ram: di.ram,
-      cpuCores: di.cpuCores,
-      connectionType: conn.effectiveType,
-      connectionSpeed: conn.downlink,
-      batteryLevel: battery.level,
-      batteryStatus: battery.charging,
-      userAgent: di.userAgent
-    };
-
-    let history = existing.visitHistory || [];
-    if (!Array.isArray(history)) history = Object.values(history).filter(Boolean);
-    history.unshift(visitEntry);
-    if (history.length > 20) history = history.slice(0, 20);
-
-    const visitorData = {
-      deviceToken,
-      deviceName: di.deviceName,
-      deviceType: di.deviceType,
-      browser: di.browser,
-      platform: di.platform,
-      language: di.language,
-      screenResolution: di.screen,
-      ram: di.ram,
-      cpuCores: di.cpuCores,
-      ip: ip || existing.ip || "N/A",
-      battery: battery.level,
-      batteryStatus: battery.charging,
-      lastVisit: now,
-      visitCount: (existing.visitCount || 0) + 1,
-      visitHistory: history,
-      firstVisit: existing.firstVisit || now
-    };
-
-    if (currentUser) {
-      visitorData.userId = currentUser.key || "";
-      visitorData.userName = currentUser.name || "User";
-      visitorData.userEmail = currentUser.email || "";
-      visitorData.userPhone = currentUser.number || "";
-      visitorData.userGender = currentUser.gender || "";
-    } else if (existing.userName) {
-      visitorData.userId = existing.userId || "";
-      visitorData.userName = existing.userName;
-      visitorData.userEmail = existing.userEmail || "";
-      visitorData.userPhone = existing.userPhone || "";
-      visitorData.userGender = existing.userGender || "";
-    }
-
-    await window._set(visitorRef, visitorData);
-  } catch (e) {
-    console.error("Visit recording error:", e);
-  }
-}
 
 async function loadWebsiteSettings() {
   const cached = getCachedSettings();
@@ -2302,8 +2164,7 @@ function setupGlobalEvents() {
     updateConnectionState();
     loadWebsiteSettings();
     loadApps();
-    recordVisit();
-    toast("Back online. Syncing live data...", "success");
+      toast("Back online. Syncing live data...", "success");
   });
 
   window.addEventListener("offline", () => {
@@ -2382,7 +2243,6 @@ function onFirebaseReady() {
   loadApps();
   loadWebsiteSettings();
   subscribeAds();
-  recordVisit();
 }
 
 window.addEventListener("firebaseReady", onFirebaseReady);

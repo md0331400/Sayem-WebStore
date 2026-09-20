@@ -168,10 +168,12 @@ a {
 .nav-shell {
   min-height: var(--header-height);
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  /* auto | shrinkable center | auto — brand can ellipsize, sides stay compact */
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 8px 0;
+  min-width: 0;
 }
 
 .header-left {
@@ -187,6 +189,8 @@ a {
   cursor: pointer;
   text-align: left;
   justify-self: center;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .brand-mark {
@@ -220,10 +224,16 @@ a {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  min-width: 0;
 }
 
 .brand-title {
   font-size: 0.95rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 800;
   letter-spacing: 0.01em;
   color: var(--text);
@@ -278,6 +288,8 @@ a {
 
 /* ---------- Nav ---------- */
 .nav-actions {
+  min-width: 0;
+  justify-self: end;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -452,8 +464,9 @@ a {
 }
 
 .banner-slide {
+  min-width: 0;
   display: none;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 26px;
   align-items: center;
   min-height: 280px;
@@ -496,6 +509,7 @@ a {
 
 .banner-title {
   font-size: clamp(1.6rem, 3.4vw, 2.4rem);
+  max-width: 100%;
   font-weight: 800;
   line-height: 1.08;
   color: var(--text);
@@ -525,6 +539,7 @@ a {
 
 /* Right column: icon on top, Download button below it */
 .banner-side {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -908,7 +923,8 @@ a {
 /* ---------- All apps grid (box cards) ---------- */
 .apps-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  /* min() lets tracks shrink below 230px on ultra-narrow/zoomed viewports */
+  grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr));
   gap: 12px;
 }
 
@@ -963,6 +979,11 @@ a {
 
 .app-download-btn {
   align-self: flex-start;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 7px 16px;
   border-radius: 999px;
   font-size: 0.78rem;
@@ -1008,7 +1029,7 @@ a {
 
 .footer-grid {
   display: grid;
-  grid-template-columns: 1.3fr 0.7fr 0.8fr 0.8fr;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
   gap: 18px;
   padding: 16px;
   border-radius: var(--radius-lg);
@@ -1216,6 +1237,11 @@ a {
   font-weight: 600;
 }
 
+.input-group input,
+.input-group select,
+.input-group textarea {
+  min-width: 0;
+}
 .input-group input,
 .input-group select,
 .input-group textarea {
@@ -1460,8 +1486,10 @@ a {
 }
 
 .modal {
-  width: min(100%, 500px);
+  width: min(calc(100% - 8px), 500px);
+  max-width: calc(100vw - 16px);
   max-height: min(90vh, 760px);
+  max-height: min(calc(100dvh - 24px), 760px);
   overflow-y: auto;
   border-radius: var(--radius-lg);
   padding: 16px;
@@ -1471,7 +1499,8 @@ a {
 }
 
 .modal-wide {
-  width: min(100%, 800px);
+  width: min(calc(100% - 8px), 800px);
+  max-width: calc(100vw - 16px);
 }
 
 .modal-header {
@@ -1549,7 +1578,7 @@ a {
 
 .app-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(90px, 100%), 1fr));
   gap: 7px;
 }
 
@@ -2893,4 +2922,71 @@ textarea:focus-visible,
   .breadcrumbs li[aria-current="page"] span { max-width: 52vw; }
   .app-info-row { font-size: 0.78rem; }
   .not-found-actions .btn { flex: 1 1 auto; }
+}
+
+/* ==========================================================================
+   v4.2 — responsive hardening for ultra-narrow / zoomed / split-screen
+   viewports (effective CSS width can drop below 320px on real devices).
+   ========================================================================== */
+
+@media (max-width: 420px) {
+  /* nowrap button labels must never set the page's min-content floor */
+  .btn { white-space: normal; }
+}
+
+@media (max-width: 360px) {
+  .nav-shell { gap: 6px; }
+  .menu-btn,
+  .theme-toggle,
+  .icon-btn { width: 34px; height: 34px; }
+  .brand-mark { width: 34px; height: 34px; }
+  .brand-mark img,
+  .brand-mark .brand-emoji { width: 28px; height: 28px; }
+  .brand-title { font-size: 0.82rem; }
+  .app-download-btn { padding: 6px 10px; font-size: 0.7rem; max-width: 42%; }
+  .banner-slide { padding-left: 32px; padding-right: 32px; }
+  .banner-side { flex-direction: column; align-items: stretch; gap: 6px; }
+  .banner-copy .btn-ghost { display: none; }
+  .detail-actions .btn { padding: 8px 12px; font-size: 0.8rem; }
+  .footer-grid { gap: 12px; padding: 12px; }
+  /* stack label/value so long labels never set a width floor */
+  .app-info-row { display: block; }
+  .app-info-row dd { text-align: left; margin-top: 2px; }
+}
+
+@media (max-width: 340px) {
+  .apps-grid,
+  .featured-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 300px) {
+  .menu-btn,
+  .theme-toggle,
+  .icon-btn { width: 30px; height: 30px; }
+  .brand-copy { display: none; }
+  .app-stats,
+  .trust-grid { grid-template-columns: minmax(0, 1fr); }
+  .banner-slide { padding-left: 26px; padding-right: 26px; }
+  .app-detail-page .app-detail-layout { padding: 10px; }
+}
+
+/* Long unbreakable strings must wrap, never widen the page */
+.review-comment,
+.review-user,
+.app-desc,
+.detail-note,
+.banner-meta,
+.footer-link,
+.chip,
+.app-name,
+.brand-title,
+.update-banner,
+.not-found-block p {
+  overflow-wrap: anywhere;
+}
+
+/* Screenshot rail scrolls inside itself only */
+.screenshots-scroll {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
 }

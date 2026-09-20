@@ -357,6 +357,39 @@ export function saveAttributionState(state, storage = safeGetStorage()) {
  * Internal SPA navigation never calls this again → source is never
  * overwritten by internal movement.
  */
+const VISIT_BEACON_KEY = "sayem_visit_beacon_v1";
+
+/**
+ * Privacy-light aggregate analytics: at most ONE beacon per browser session
+ * (sessionStorage-gated), carrying only the normalized source/type/campaign
+ * and the landing path. No identity, no IP, no fingerprint, best-effort —
+ * failures are swallowed and can never block rendering or signup.
+ */
+export function sendVisitBeacon(state, landingPage) {
+  try {
+    if (typeof window === "undefined" || !window.fetch) return;
+    if (window.sessionStorage && window.sessionStorage.getItem(VISIT_BEACON_KEY)) return;
+    const touch = (state && (state.latestTouch || state.firstTouch)) || null;
+    const payload = {
+      source: touch && touch.source ? touch.source : "Direct",
+      sourceType: touch && touch.sourceType ? touch.sourceType : "Direct",
+      campaign: touch && touch.campaign ? touch.campaign : "",
+      landing: landingPage || (window.location && window.location.pathname) || "/",
+    };
+    if (window.sessionStorage) window.sessionStorage.setItem(VISIT_BEACON_KEY, "1");
+    window
+      .fetch("/api/visit", {
+        method: "POST",
+        keepalive: true,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      .catch(() => {});
+  } catch {
+    /* analytics must never break the page */
+  }
+}
+
 export function initAttribution({ landingPage } = {}) {
   try {
     const path = landingPage || window.location.pathname || "/";
@@ -377,6 +410,7 @@ export function initAttribution({ landingPage } = {}) {
       window.history.replaceState(window.history.state, "", `${window.location.pathname}${cleaned || ""}${window.location.hash || ""}`);
     }
 
+    sendVisitBeacon(runtimeState, path);
     return runtimeState;
   } catch {
     return defaultState();

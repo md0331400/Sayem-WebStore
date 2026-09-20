@@ -27,9 +27,21 @@ const gamePath = getAppPath(game, index);
 const legacyPath = getAppPath(legacy, index);
 
 // ---- mock Firebase REST ----
+const fbStore = new Map();
 const mockFb = http.createServer((req, res) => {
   const url = new URL(req.url, "http://x");
   res.setHeader("Content-Type", "application/json");
+  if (req.method === "PUT" || req.method === "PATCH") {
+    let b = "";
+    req.on("data", (c) => (b += c));
+    req.on("end", () => {
+      fbStore.set(url.pathname, b);
+      res.end("null");
+    });
+    return;
+  }
+  const stored = fbStore.get(url.pathname);
+  if (stored !== undefined) return res.end(stored);
   if (url.pathname === "/apps.json") return res.end(JSON.stringify(FIXTURE_APPS));
   if (url.pathname === "/users.json") return res.end(JSON.stringify(FIXTURE_USERS));
   if (url.pathname === "/settings/websiteName.json") return res.end("null");
@@ -217,6 +229,38 @@ try {
     const { body } = await get("/manifest.json");
     const manifest = JSON.parse(body);
     assertEq(manifest.name, "Sayem WebStore");
+  });
+  suite("Anonymous aggregate analytics (/api/visit)");
+  await test("POST aggregates daily source/landing/campaign counters", async () => {
+    const res = await fetch(`${DEV}/api/visit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "facebook", sourceType: "Social", campaign: "launch_2026", landing: "/app/kotha-bolbo?utm_source=x" }),
+    });
+    assertEq(res.status, 204);
+    assert(!res.headers.get("set-cookie"), "analytics endpoint must not set cookies");
+    const day = new Date().toISOString().slice(0, 10);
+    const fb = async (p) => (await fetch(`http://127.0.0.1:${MOCK_FB_PORT}${p}.json`)).json();
+    assertEq(await fb(`/analytics/daily/${day}/sources/Facebook/visits`), 1);
+    assertEq(await fb(`/analytics/daily/${day}/landing/~app~kotha-bolbo/visits`), 1);
+    assertEq(await fb(`/analytics/daily/${day}/campaigns/launch_2026/visits`), 1);
+    assertEq(await fb(`/analytics/daily/${day}/visits`), 1);
+  });
+  await test("garbage input normalizes; GET + OPTIONS supported", async () => {
+    await fetch(`${DEV}/api/visit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "<script>alert(1)</script>", sourceType: "Hacker", campaign: "x".repeat(200), landing: "/../../etc/passwd" }),
+    });
+    const day = new Date().toISOString().slice(0, 10);
+    const fb = async (p) => (await fetch(`http://127.0.0.1:${MOCK_FB_PORT}${p}.json`)).json();
+    assertEq(await fb(`/analytics/daily/${day}/sources/Unknown/visits`), 1);
+    const g = await fetch(`${DEV}/api/visit?source=google&type=Search&landing=/games`);
+    assertEq(g.status, 204);
+    assertEq(await fb(`/analytics/daily/${day}/sources/Google/visits`), 1);
+    assertEq(await fb(`/analytics/daily/${day}/landing/~games/visits`), 1);
+    const o = await fetch(`${DEV}/api/visit`, { method: "OPTIONS" });
+    assertEq(o.status, 204);
   });
 } finally {
   dev.kill("SIGTERM");

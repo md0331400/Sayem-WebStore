@@ -105,3 +105,20 @@ deployment with the migration steps in §1.
 ## 8. Reporting issues
 
 Email abusayem0866@gmail.com (also linked in the site footer) for security reports.
+
+## 9. Download counter abuse resistance (honest limitations)
+
+- Counters increment through a Firebase `runTransaction` on the app record, so concurrent clicks never lose an increment (atomic read-modify-write).
+- Increments are client-initiated because the Realtime Database rules are open (see §2). A determined attacker can therefore still inflate a counter by writing to the database directly. Server-side enforcement becomes possible only after the proposed rules in §4 are reviewed and deployed by the owner; this release deliberately did **not** deploy them.
+- Mitigations in place: transactional atomicity, no client-side trust for displayed values (always read from the database), guest-download increments limited to one per click event, and admin visibility of abnormal counts.
+
+## 10. Visitor tracking discontinuation & anonymous analytics
+
+- A pre-existing per-device visitor tracker stored IP address, user-agent, screen, RAM/CPU, battery state and (when logged in) the account's name/email/phone per visit. That collection was **removed** from the client in this release; no code path writes to `visitors/` anymore.
+- Legacy `visitors/` records remain in the database until the owner purges them (admin → Visitors → Clear All). The admin UI now masks identifying fields (only device name, platform, browser, language, visit counts and timestamps are rendered).
+- Replacement analytics (`POST /api/visit`) is aggregate-only: at most one event per browser session (sessionStorage-gated), carrying normalized source/sourceType/campaign/landing-path. The server stores only daily counters (`analytics/daily/{date}/…`). No IP, no cookies, no fingerprint, no per-pageview writes. Signup conversion adds exactly one increment per signup.
+
+## 11. Attribution storage summary
+
+- Priority: UTM parameters > external referrer > Direct. First-touch attribution is immutable once stored; latest-touch updates only from external referrers; pre-signup state lives in `localStorage` (`sayemweb_attribution_v1`) with a 90-day TTL and is validated on read (corrupted values fall back safely).
+- At signup the attribution snapshot is stored on the user record together with, but separate from, the user's own "how did you hear about us" answer.

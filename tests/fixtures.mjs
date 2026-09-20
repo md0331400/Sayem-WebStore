@@ -67,6 +67,26 @@ export const FIXTURE_APPS = {
   }
 };
 
+const dkey = (offsetDays) => new Date(NOW - offsetDays * DAY).toISOString().slice(0, 10);
+export const FIXTURE_ANALYTICS = {
+  daily: {
+    [dkey(0)]: {
+      visits: 12,
+      sources: {
+        Facebook: { visits: 5, signups: 2 },
+        Google: { visits: 4, signups: 1 },
+        Direct: { visits: 3, signups: 0 },
+      },
+      landing: { "~": { visits: 7 }, "~app~kotha-bolbo": { visits: 5 } },
+    },
+    [dkey(1)]: {
+      visits: 9,
+      sources: { TikTok: { visits: 6, signups: 1 }, Google: { visits: 3, signups: 0 } },
+      landing: { "~game~samva-online-tic-tac-toe": { visits: 4 }, "~": { visits: 5 } },
+    },
+  },
+};
+
 export function fixtureAppsArray() {
   return Object.entries(FIXTURE_APPS).map(([key, value]) => ({ key, ...value }));
 }

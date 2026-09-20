@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { suite, test, assert, assertEq, assertIncludes, assertNotIncludes, summarize } from "./harness.mjs";
-import { FIXTURE_APPS, FIXTURE_USERS, FIXTURE_ADMINS, fixtureAppsArray, NOW } from "./fixtures.mjs";
+import { FIXTURE_APPS, FIXTURE_USERS, FIXTURE_ADMINS, FIXTURE_ANALYTICS, fixtureAppsArray, NOW } from "./fixtures.mjs";
 import { buildAppSlugIndex, getAppPath } from "../seo-utils.js";
 
 const require = createRequire("/tmp/e2e/package.json");
@@ -103,6 +103,7 @@ async function installSpies(page) {
       window.__writes.push({ op: "set", path: r.path, value: v });
       return Promise.resolve();
     };
+    window._increment = (n) => ({ ".increment": n });
     window._update = (r, v) => {
       window.__writes.push({ op: "update", path: r.path, value: v });
       return Promise.resolve();
@@ -610,7 +611,7 @@ try {
     await page.goto(DEV + "/admin", { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#adminUser", { timeout: 10000 });
     await page.evaluate(
-      ({ users, apps, admins, reports }) => {
+      ({ users, apps, admins, reports, analytics }) => {
         const snap = (value) => ({
           exists: () => value !== null && value !== undefined,
           val: () => value,
@@ -629,6 +630,7 @@ try {
           [/^visitors$/, {}],
           [/^adStats$/, { total: 7, daily: {}, perAd: {}, perSlot: {} }],
           [/^adminActivity$/, {}],
+          [/^analytics$/, analytics],
           [/^ads$/, {}],
           [/^settings\/adsInitialized$/, true],
           [/^settings\/adsMaxPerSlot$/, 2],
@@ -650,9 +652,10 @@ try {
         window._push = (r) => ({ path: `${r.path}/-AdminSpy1`, key: "-AdminSpy1", toString: () => `${r.path}/-AdminSpy1` });
         window._set = (r, v) => { window.__adminWrites.push({ op: "set", path: r.path, value: v }); return Promise.resolve(); };
         window._update = (r, v) => { window.__adminWrites.push({ op: "update", path: r.path, value: v }); return Promise.resolve(); };
+        window._increment = (n) => ({ ".increment": n });
         window._remove = (r) => { window.__adminWrites.push({ op: "remove", path: r.path }); return Promise.resolve(); };
       },
-      { users: FIXTURE_USERS, apps: FIXTURE_APPS, admins: FIXTURE_ADMINS, reports: FIXTURE_REPORTS }
+      { users: FIXTURE_USERS, apps: FIXTURE_APPS, admins: FIXTURE_ADMINS, reports: FIXTURE_REPORTS, analytics: FIXTURE_ANALYTICS }
     );
     await page.type("#adminUser", "testadmin");
     await page.type("#adminPass", "testpass123");
@@ -969,6 +972,87 @@ try {
     await new Promise((r) => setTimeout(r, 300));
     const reportsText = await page.$eval("#adminReportsList", (e) => e.textContent);
     assertIncludes(reportsText, "Broken link");
+    await context.close();
+  });
+  suite("Anonymous aggregate analytics (client side)");
+  await test("visit beacon fires once per browser session", async () => {
+    const { page, context } = await newPage(APP_CACHE_SEED);
+    const visits = [];
+    page.on("request", (r) => {
+      if (r.url().includes("/api/visit") && r.method() === "POST") visits.push(r.postData());
+    });
+    await page.goto(DEV + "/", { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("a.app-card", { timeout: 10000 });
+    await page.evaluate(() => window.navigateTo("/apps"));
+    await new Promise((r) => setTimeout(r, 400));
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector("a.app-card", { timeout: 10000 });
+    await new Promise((r) => setTimeout(r, 600));
+    assertEq(visits.length, 1, `exactly one beacon per session, got ${visits.length}`);
+    const payload = JSON.parse(visits[0]);
+    assertEq(payload.source, "Direct");
+    assertEq(payload.landing, "/");
+    assert(!("ip" in payload) && !("ua" in payload) && !("id" in payload), "payload carries no identity fields");
+    await context.close();
+  });
+  await test("signup writes one aggregate signup increment for its source", async () => {
+    const { page, context } = await newPage(APP_CACHE_SEED, "https://m.facebook.com/");
+    await page.goto(DEV + "/", { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("a.app-card", { timeout: 10000 });
+    await installSpies(page);
+    await page.evaluate(() => { window.showPage("authPage"); window.switchAuth("signup"); });
+    await page.type("#signName", "Aggregate Test");
+    await page.type("#signEmail", "agg@test.example.com");
+    await page.type("#signPhone", "+8801799999999");
+    await page.type("#signPass", "secret123");
+    await page.evaluate(() => window.doSignup());
+    await page.waitForFunction(() => window.__writes.some((w) => w.path.startsWith("users/")), { timeout: 5000 });
+    await new Promise((r) => setTimeout(r, 300));
+    const writes = await page.evaluate(() => window.__writes);
+    const day = new Date().toISOString().slice(0, 10);
+    const agg = writes.filter((w) => w.path === `analytics/daily/${day}/sources/Facebook/signups`);
+    assertEq(agg.length, 1, "one aggregate signup increment for Facebook");
+    assertEq(agg[0].op, "update");
+    assertEq(agg[0].value[".increment"], 1);
+    await context.close();
+  });
+  suite("Public copy honesty");
+  await test("no fabricated 'verified download' claims; privacy matches reality", async () => {
+    const { page, context } = await newPage(APP_CACHE_SEED);
+    await page.goto(DEV + "/", { waitUntil: "domcontentloaded" });
+    const home = await page.evaluate(() => document.body.innerText);
+    assert(!/verified and served/i.test(home), "fabricated verification claim removed");
+    assertIncludes(home, "Direct Publisher Links");
+    await page.evaluate(() => window.navigateTo("/privacy"));
+    await new Promise((r) => setTimeout(r, 250));
+    const priv = await page.evaluate(() => document.getElementById("privacyPage").innerText);
+    assertIncludes(priv, "no IP address");
+    assertIncludes(priv, "once per browser session");
+    assertIncludes(priv, "Legacy Visit Records");
+    await page.evaluate(() => window.navigateTo("/terms"));
+    await new Promise((r) => setTimeout(r, 250));
+    const terms = await page.evaluate(() => document.getElementById("termsPage").innerText);
+    assertIncludes(terms, "Analytics & Attribution");
+    await page.evaluate(() => window.navigateTo("/faq"));
+    await new Promise((r) => setTimeout(r, 250));
+    const faq = await page.evaluate(() => document.getElementById("faqPage").innerText);
+    assertIncludes(faq, "publisher's own download");
+    await context.close();
+  });
+  suite("Admin conversion + landing aggregates");
+  await test("traffic panel renders visitor-to-signup conversion and landing tables", async () => {
+    const { page, context } = await openAdmin();
+    await page.evaluate(() => showPanel("trafficPanel"));
+    await page.waitForSelector("#trafficConvTable table", { timeout: 5000 });
+    const conv = await page.$eval("#trafficConvTable", (el) => el.textContent);
+    assertIncludes(conv, "Facebook");
+    assertIncludes(conv, "Visitors");
+    const land = await page.$eval("#trafficLandingTable", (el) => el.textContent);
+    assertIncludes(land, "/app/kotha-bolbo");
+    await page.select("#trafficRangeSelect", "yesterday");
+    await new Promise((r) => setTimeout(r, 400));
+    const landY = await page.$eval("#trafficLandingTable", (el) => el.textContent);
+    assertIncludes(landY, "/game/samva-online-tic-tac-toe");
     await context.close();
   });
 } catch (err) {

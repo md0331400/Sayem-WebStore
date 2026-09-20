@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Sayem WebStore • Admin Panel</title>
   <meta name="robots" content="noindex, nofollow">
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -47,8 +47,8 @@
     .header-actions { display: flex; gap: 8px; align-items: center; }
     .admin-container { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
     .admin-header { background: linear-gradient(135deg, rgba(255,140,66,0.15), rgba(255,140,66,0.05)); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-    .admin-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px; }
-    @media(max-width:900px){ .admin-stats { grid-template-columns: repeat(2, 1fr); } }
+    .admin-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+    @media(max-width:900px){ .admin-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     .stat-card { background: var(--card2); border-radius: 8px; padding: 12px 14px; text-align: center; min-width: 0; border: 1px solid transparent; }
     .stat-card.stat-highlight { border-color: var(--orange); background: linear-gradient(135deg, rgba(255,140,66,0.18), rgba(255,140,66,0.06)); }
     .stat-number { font-size: 24px; font-weight: 700; color: var(--orange); }
@@ -58,7 +58,7 @@
     .admin-tab.active { background: var(--orange); color: #000; }
     .admin-panel { display: none; }
     .admin-panel.active { display: block; }
-    .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
     .dashboard-grid .span-2 { grid-column: 1 / -1; }
     @media(max-width:768px){ .dashboard-grid { grid-template-columns: 1fr; } }
     .dash-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
@@ -111,7 +111,7 @@
     .ad-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
     .slot-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
     .slot-chip { font-size: 10px; padding: 3px 10px; border-radius: 99px; background: var(--orange-dim); color: var(--orange); border: 1px solid var(--border); font-weight: 600; }
-    .slot-pick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .slot-pick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
     @media(max-width:640px){ .slot-pick-grid { grid-template-columns: 1fr; } }
     .slot-pick { display: flex; gap: 10px; align-items: flex-start; background: var(--card2); border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 12px; cursor: pointer; transition: all .2s; }
     .slot-pick:hover { border-color: var(--orange); }
@@ -126,13 +126,23 @@
     .switch input:checked + .track::before { transform: translateX(20px); background: #22c55e; }
     .impressions-badge { font-size: 11px; color: var(--text); background: var(--card2); border: 1px solid var(--border); padding: 3px 10px; border-radius: 99px; font-weight: 700; }
     .impressions-badge b { color: var(--orange); }
-    .slot-stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .slot-stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap: 8px; }
     .slot-stat { background: var(--card2); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 8px 12px; font-size: 11px; color: var(--text-dim); }
     .slot-stat b { display: block; font-size: 16px; color: var(--orange); }
     .note-box { background: var(--card2); border: 1px dashed var(--border); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--text-dim); line-height: 1.6; }
 
     /* ===== v4.1 — Users table, traffic sources, acquisition details ===== */
     .user-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
+    .user-filters input, .user-filters select { min-width:0; max-width:100%; }
+    .traffic-grid > * { min-width:0; overflow-x:auto; }
+    .traffic-table { width:100%; border-collapse:collapse; }
+    .user-row { min-width:0; }
+    .user-row .src-badge, .user-row .campaign-badge, .user-row .user-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #genLinkOutput { overflow-wrap:anywhere; word-break:break-all; max-width:100%; }
+    .acq-grid > div { min-width:0; overflow-wrap:anywhere; }
+    input, select, textarea { min-width:0; max-width:100%; }
+    .admin-tabs { overflow-x:auto; flex-wrap:nowrap; scrollbar-width:thin; }
+    @media(max-width:640px){ .admin-tabs { flex-wrap:wrap; } }
     .user-filters input[type=text] { flex:1 1 220px; background:var(--card2); border:1.5px solid var(--border); color:var(--text); padding:9px 12px; border-radius:8px; font-family:'Exo 2',sans-serif; font-size:13px; outline:none; min-width:0; }
     .user-filters input[type=text]:focus { border-color:var(--orange); }
     .user-filters select { background:var(--card2); border:1.5px solid var(--border); color:var(--text); padding:9px 10px; border-radius:8px; font-size:13px; outline:none; max-width:200px; font-family:'Exo 2',sans-serif; }
@@ -145,7 +155,7 @@
     .traffic-head { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
     .traffic-range { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     .traffic-range select, .traffic-range input[type=date] { background:var(--card2); border:1.5px solid var(--border); color:var(--text); padding:8px 10px; border-radius:8px; font-size:13px; outline:none; font-family:'Exo 2',sans-serif; }
-    .traffic-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
+    .traffic-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; margin-top:14px; }
     @media(max-width:900px){ .traffic-grid { grid-template-columns:1fr; } }
     .traffic-table { width:100%; border-collapse:collapse; font-size:13px; }
     .traffic-table th { text-align:left; font-size:11px; color:var(--text-dim); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--border); }
@@ -154,14 +164,17 @@
     .traffic-row:hover td { background:var(--orange-dim); }
     .traffic-count { color:var(--orange); font-weight:700; text-align:right; }
     .traffic-empty { color:var(--text-dim); font-size:13px; padding:14px; text-align:center; }
-    .acq-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .acq-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; }
     @media(max-width:640px){ .acq-grid { grid-template-columns:1fr; } .user-filters select { max-width:none; flex:1 1 140px; } }
     .acq-item { background:var(--card2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; min-width:0; }
     .acq-label { font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; }
     .acq-value { font-size:13px; font-weight:600; margin-top:2px; word-break:break-word; }
     .section-sub { font-size:12px; color:var(--orange); font-weight:700; margin:16px 0 8px; text-transform:uppercase; letter-spacing:.4px; }
     .gen-output { background:var(--card2); border:1px solid var(--border); border-radius:8px; padding:10px; font-family:monospace; font-size:12px; word-break:break-all; color:#4ade80; min-height:38px; margin:10px 0; }
-    .gen-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .gen-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; }
+    .form-cols-2 { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
+    .form-cols-3 { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; }
+    @media(max-width:640px){ .form-cols-2, .form-cols-3 { grid-template-columns:minmax(0,1fr); } }
     @media(max-width:640px){ .gen-grid { grid-template-columns:1fr; } }
     .gen-hint { font-size:11px; color:var(--text-dim); margin-top:4px; }
   </style>
@@ -238,8 +251,11 @@
       <div class="dashboard-grid">
         <div class="dash-card">
           <div class="dash-card-title">
-            <span>👥 Visitors (Click to view)</span>
+            <span>👥 Legacy device archive (read-only)</span>
             <button class="btn btn-warning btn-xs" id="btnClearAllVisitors">🗑 Clear All</button>
+          </div>
+          <div style="font-size:11px;color:var(--text-dim);padding:8px 10px;border:1px dashed var(--border);border-radius:8px;margin-bottom:10px;">
+            ⚠️ Per-device visit tracking (IP, user-agent, hardware, battery) was <strong>discontinued</strong>. The rows below are legacy records collected before that change; identifying fields are hidden here. Use <strong>Clear All</strong> to purge them permanently. Live traffic insight is in the <strong>Traffic</strong> tab (anonymous aggregates only).
           </div>
           <div class="visitor-list" id="visitorListContainer"><div class="spinner"></div></div>
         </div>
@@ -260,7 +276,7 @@
     <div class="admin-panel" id="addApp">
       <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;">
         <div style="font-weight:700;font-size:16px;margin-bottom:14px;">➕ Add App</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-cols-2">
           <div class="input-group" style="margin-bottom:10px;"><label>Name *</label><input id="aName" placeholder="App name"></div>
           <div class="input-group" style="margin-bottom:10px;"><label>Category</label>
             <select id="aCategory">
@@ -269,20 +285,20 @@
             </select>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-cols-2">
           <div class="input-group" style="margin-bottom:10px;"><label>Icon (Emoji)</label><input id="aIcon" value="📱" placeholder="📱"></div>
           <div class="input-group" style="margin-bottom:10px;"><label>Image URL</label><input id="aImageUrl" placeholder="https://example.com/image.png"></div>
         </div>
         <div class="input-group" style="margin-bottom:10px;"><label>Download Link</label><input id="aLink" placeholder="https://play.google.com/..."></div>
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📦 Version Info (optional — used for app update checking &amp; SEO)</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div class="form-cols-3">
           <div class="input-group" style="margin-bottom:10px;"><label>Version Name</label><input id="aVersionName" placeholder="2.5.1"></div>
           <div class="input-group" style="margin-bottom:10px;"><label>Version Code</label><input id="aVersionCode" type="number" min="0" step="1" placeholder="25"></div>
           <div class="input-group" style="margin-bottom:10px;"><label>Package Name</label><input id="aPackageName" placeholder="com.example.app"></div>
         </div>
         <div class="input-group" style="margin-bottom:10px;"><label>Description *</label><textarea id="aDesc" rows="2" placeholder="Describe the app..."></textarea></div>
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📸 App Screenshots (optional)</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-cols-2">
           <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 1</label><input id="aScreen1" placeholder="https://..."></div>
           <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 2</label><input id="aScreen2" placeholder="https://..."></div>
           <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 3</label><input id="aScreen3" placeholder="https://..."></div>
@@ -369,6 +385,14 @@
         <div class="dash-card">
           <div class="dash-card-title"><span>🗣️ "How did you hear about us?" answers</span></div>
           <div id="trafficAnswerTable"><div class="spinner"></div></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-title"><span>📊 Visitor → Signup conversion</span><span style="font-size:11px;color:var(--text-dim);font-weight:400;">anonymous aggregate sessions · no identities</span></div>
+          <div id="trafficConvTable"><div class="spinner"></div></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-title"><span>🛬 Landing pages (aggregate visits)</span></div>
+          <div id="trafficLandingTable"><div class="spinner"></div></div>
         </div>
         <div class="dash-card">
           <div class="dash-card-title"><span>🔗 Campaign Link Generator</span></div>
@@ -548,7 +572,8 @@ window.dispatchEvent(new Event('firebaseReady'));
 let firebaseReady = false, currentAdminKey = null, allVisitorsData = [], currentVisitorKey = null;
 let confirmCallback = null;
 let cachedAds = [], cachedAdStats = {};
-let allUsersCache = null;                     // [{key, ...user}] — single fetch reused by Users + Traffic
+let allUsersCache = null;
+let analyticsCache = undefined;                     // [{key, ...user}] — single fetch reused by Users + Traffic
 let userFilters = { q: '', source: '', campaign: '' };
 let trafficRange = '30d';
 let currentDetailUserKey = null;
@@ -866,15 +891,10 @@ async function loadVisitors() {
       recent.forEach(v => {
         const lv = v.lastVisit ? new Date(v.lastVisit).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
         const dn = v.deviceName || 'Unknown';
-        const hist = v.visitHistory;
-        const hc = hist ? (Array.isArray(hist) ? hist.length : Object.keys(hist).length) : 0;
         h += `<div class="visitor-item" data-visitor-key="${esc(v.key)}">
           <div class="visitor-info">
-            <span class="visitor-name">${esc(v.userName || dn)}</span>
-            <span class="badge ${v.userName ? 'user' : 'guest'}">${v.userName ? 'user' : 'guest'}</span>
-            <span class="visitor-detail">• ${esc(dn)}</span>
-            <span class="visitor-detail">• ${esc(v.ram || 'N/A')}</span>
-            <span class="visitor-detail">• ${hc} visits</span>
+            <span class="visitor-name">${esc(dn)}</span>
+            <span class="visitor-detail">• ${v.visitCount || 1} visits</span>
           </div>
           <div class="visitor-time">${lv}</div>
         </div>`;
@@ -910,41 +930,26 @@ async function showVisitorDetail(vk) {
     return;
   }
 
-  const isU = !!v.userName;
   const dn = v.deviceName || 'Unknown Device';
   const fv = v.firstVisit ? new Date(v.firstVisit).toLocaleString() : 'N/A';
   const lv = v.lastVisit ? new Date(v.lastVisit).toLocaleString() : 'N/A';
 
   let h = `<div style="text-align:center;margin-bottom:20px;">
-    <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--orange),var(--orange-light));display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#000;margin:0 auto 10px;">${isU ? (v.userName || 'U')[0].toUpperCase() : '📱'}</div>
-    <div style="font-size:18px;font-weight:700;">${esc(isU ? v.userName : dn)}</div>
-    <div style="font-size:12px;color:var(--text-dim);">${isU ? 'Registered User' : 'Guest Device'} • ${v.visitCount || 0} total visits</div>
-  </div>`;
-
-  if (isU) {
-    h += `
-    <div class="detail-row"><span class="detail-label">👤 Name</span><span class="detail-value">${esc(v.userName)}</span></div>
-    <div class="detail-row"><span class="detail-label">📧 Email</span><span class="detail-value">${esc(v.userEmail || 'N/A')}</span></div>
-    <div class="detail-row"><span class="detail-label">📱 Phone</span><span class="detail-value">${esc(v.userPhone || 'N/A')}</span></div>
-    <div class="detail-row"><span class="detail-label">⚧ Gender</span><span class="detail-value">${esc(v.userGender || 'N/A')}</span></div>`;
-  }
+    <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--orange),var(--orange-light));display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#000;margin:0 auto 10px;">📱</div>
+    <div style="font-size:18px;font-weight:700;">${esc(dn)}</div>
+    <div style="font-size:12px;color:var(--text-dim);">Legacy record • ${v.visitCount || 0} total visits</div>
+  </div>
+  <div style="font-size:11px;color:var(--text-dim);padding:8px 10px;border:1px dashed var(--border);border-radius:8px;margin-bottom:14px;">Identifying fields (name, contact info, IP, user-agent, hardware, battery) are intentionally not displayed and should be purged with Clear All.</div>`;
 
   h += `
   <div class="detail-row"><span class="detail-label">📱 Device</span><span class="detail-value">${esc(dn)}</span></div>
-  <div class="detail-row"><span class="detail-label">🧠 RAM</span><span class="detail-value">${esc(v.ram || 'N/A')}</span></div>
-  <div class="detail-row"><span class="detail-label">⚙️ CPU</span><span class="detail-value">${esc(v.cpuCores || 'N/A')} cores</span></div>
   <div class="detail-row"><span class="detail-label">🖥 Platform</span><span class="detail-value">${esc(v.platform || 'N/A')}</span></div>
-  <div class="detail-row"><span class="detail-label">📐 Screen</span><span class="detail-value">${esc(v.screenResolution || 'N/A')}</span></div>
-  <div class="detail-row"><span class="detail-label">🌐 IP</span><span class="detail-value">${esc(v.ip || 'N/A')}</span></div>
-  <div class="detail-row"><span class="detail-label">🔋 Battery</span><span class="detail-value">${esc(v.battery || 'N/A')} ${esc(v.batteryStatus || '')}</span></div>
   <div class="detail-row"><span class="detail-label">🌐 Browser</span><span class="detail-value">${esc(v.browser || 'N/A')}</span></div>
   <div class="detail-row"><span class="detail-label">🗣 Language</span><span class="detail-value">${esc(v.language || 'N/A')}</span></div>
   <div class="detail-row"><span class="detail-label">🕐 First Visit</span><span class="detail-value">${fv}</span></div>
   <div class="detail-row"><span class="detail-label">🕑 Last Visit</span><span class="detail-value">${lv}</span></div>
-  <div class="detail-row"><span class="detail-label">🔢 Visit Count</span><span class="detail-value">${v.visitCount || 1} times</span></div>
-  <div class="detail-row"><span class="detail-label">🔑 Device Token</span><span class="detail-value" style="font-size:10px;">${esc(v.deviceToken || v.key || 'N/A')}</span></div>`;
+  <div class="detail-row"><span class="detail-label">🔢 Visit Count</span><span class="detail-value">${v.visitCount || 1} times</span></div>`;
 
-  // Visit History
   let hist = [];
   if (v.visitHistory) {
     hist = Array.isArray(v.visitHistory) ? v.visitHistory.filter(Boolean) : Object.values(v.visitHistory).filter(Boolean);
@@ -952,7 +957,7 @@ async function showVisitorDetail(vk) {
   }
 
   h += `<div style="margin-top:24px;border-top:1px solid var(--border);padding-top:16px;">
-    <div style="font-weight:700;font-size:15px;color:var(--orange);margin-bottom:12px;">📜 Visit History (${hist.length} entries)</div>`;
+    <div style="font-weight:700;font-size:15px;color:var(--orange);margin-bottom:12px;">📜 Visit timestamps (${hist.length} entries)</div>`;
 
   if (!hist.length) {
     h += '<div style="color:var(--text-dim);text-align:center;padding:20px;">No history recorded yet</div>';
@@ -962,13 +967,6 @@ async function showVisitorDetail(vk) {
       const vt = new Date(vh.timestamp).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
       h += `<div class="history-item">
         <div class="history-time">#${i + 1} • ${vt}</div>
-        <div class="history-details">
-          <span class="history-badge">🌐 ${esc(vh.ip || 'N/A')}</span>
-          <span class="history-badge">🌐 ${esc(vh.browser || 'N/A')}</span>
-          <span class="history-badge">📐 ${esc(vh.screenResolution || 'N/A')}</span>
-          <span class="history-badge">🧠 ${esc(vh.ram || 'N/A')}</span>
-          <span class="history-badge">🔋 ${esc(vh.batteryLevel || 'N/A')}</span>
-        </div>
       </div>`;
     });
     h += '</div>';
@@ -1215,7 +1213,7 @@ function openEditApp(k) {
     if (!a) { toast('App not found', 'error'); return; }
     document.getElementById('editAppContent').innerHTML = `
       <input type="hidden" id="editAppKey" value="${esc(k)}">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-cols-2">
         <div class="input-group" style="margin-bottom:10px;"><label>Name</label><input id="editName" value="${esc(a.name)}" placeholder="App name"></div>
         <div class="input-group" style="margin-bottom:10px;"><label>Category</label>
           <select id="editCategory">
@@ -1223,20 +1221,20 @@ function openEditApp(k) {
           </select>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-cols-2">
         <div class="input-group" style="margin-bottom:10px;"><label>Icon</label><input id="editIcon" value="${esc(a.icon || '📱')}" placeholder="📱"></div>
         <div class="input-group" style="margin-bottom:10px;"><label>Image URL</label><input id="editImageUrl" value="${esc(a.imageUrl || '')}" placeholder="https://..."></div>
       </div>
       <div class="input-group" style="margin-bottom:10px;"><label>Link</label><input id="editLink" value="${esc(a.link || '')}" placeholder="https://..."></div>
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📦 Version Info</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div class="form-cols-3">
         <div class="input-group" style="margin-bottom:10px;"><label>Version Name</label><input id="editVersionName" value="${esc(a.versionName || '')}" placeholder="2.5.1"></div>
         <div class="input-group" style="margin-bottom:10px;"><label>Version Code</label><input id="editVersionCode" type="number" min="0" step="1" value="${a.versionCode !== null && a.versionCode !== undefined ? esc(String(a.versionCode)) : ''}" placeholder="25"></div>
         <div class="input-group" style="margin-bottom:10px;"><label>Package Name</label><input id="editPackageName" value="${esc(a.packageName || '')}" placeholder="com.example.app"></div>
       </div>
       <div class="input-group" style="margin-bottom:10px;"><label>Description</label><textarea id="editDesc" rows="2" placeholder="App description...">${esc(a.description || '')}</textarea></div>
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📸 App Screenshots</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-cols-2">
         <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 1</label><input id="editScreen1" value="${esc(a.screenshot1 || '')}" placeholder="https://..."></div>
         <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 2</label><input id="editScreen2" value="${esc(a.screenshot2 || '')}" placeholder="https://..."></div>
         <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 3</label><input id="editScreen3" value="${esc(a.screenshot3 || '')}" placeholder="https://..."></div>
@@ -1567,6 +1565,39 @@ function renderTraffic() {
       : `<div class="traffic-empty">No campaign (utm_campaign) signups in this range.</div>`;
   }
 
+  const agg = aggregateAnalytics(analyticsCache || null, trafficRange, fromStr, toStr);
+
+  const convTable = document.getElementById('trafficConvTable');
+  if (convTable) {
+    const srcSet = new Set([...Object.keys(agg.visitsBySource), ...Object.keys(stats.bySource)]);
+    const rows = [...srcSet]
+      .map((src) => {
+        const visits = agg.visitsBySource[src] || 0;
+        const signups = stats.bySource[src] || 0;
+        const rate = visits > 0 ? ((signups / visits) * 100).toFixed(1) + '%' : '—';
+        return { src, visits, signups, rate, sort: visits };
+      })
+      .sort((a, b) => b.sort - a.sort);
+    convTable.innerHTML = rows.length
+      ? `<table class="traffic-table"><thead><tr><th>Source</th><th style="text-align:right;">Visitors</th><th style="text-align:right;">Signups</th><th style="text-align:right;">Signup rate</th></tr></thead><tbody>${
+          rows.map((r) => `<tr class="traffic-row" data-traffic-source="${esc(r.src)}"><td>${esc(r.src)}</td><td class="traffic-count">${r.visits}</td><td class="traffic-count">${r.signups}</td><td class="traffic-count">${r.rate}</td></tr>`).join('')
+        }</tbody></table>`
+      : `<div class="traffic-empty">No aggregate visitor data in this range yet.</div>`;
+  }
+
+  const landTable = document.getElementById('trafficLandingTable');
+  if (landTable) {
+    const rows = Object.entries(agg.landing)
+      .map(([k, n]) => ({ path: k === '~' ? '/' : '/' + k.split('~').filter(Boolean).join('/'), n }))
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 12);
+    landTable.innerHTML = rows.length
+      ? `<table class="traffic-table"><thead><tr><th>Landing path</th><th style="text-align:right;">Visits</th></tr></thead><tbody>${
+          rows.map((r) => `<tr><td style="overflow-wrap:anywhere;">${esc(r.path)}</td><td class="traffic-count">${r.n}</td></tr>`).join('')
+        }</tbody></table>`
+      : `<div class="traffic-empty">No landing-page aggregates in this range yet.</div>`;
+  }
+
   const ansTable = document.getElementById('trafficAnswerTable');
   if (ansTable) {
     const rows = Object.entries(stats.byAnswer).sort((a, b) => b[1] - a[1]);
@@ -1587,7 +1618,35 @@ async function loadTraffic() {
       if (s.exists()) s.forEach(c => { allUsersCache.push({ ...(c.val() || {}), key: c.key }); });
     } catch { allUsersCache = allUsersCache || []; }
   }
+  if (analyticsCache === undefined) {
+    try {
+      const a = await window._get(window._ref(window._db, 'analytics'));
+      analyticsCache = a.exists() ? (a.val() || null) : null;
+    } catch { analyticsCache = null; }
+  }
   renderTraffic();
+}
+
+/** Aggregate the anonymous daily analytics buckets inside the selected range. */
+function aggregateAnalytics(cache, range, fromStr, toStr) {
+  const out = { visitsBySource: {}, signupsBySource: {}, landing: {}, totalVisits: 0 };
+  const [start, end] = getRangeBounds(range, fromStr, toStr);
+  // Day buckets are UTC keys (api/visit + signup increments); compare as dates.
+  const dayFrom = new Date(Math.min(start, Date.now())).toISOString().slice(0, 10);
+  const dayTo = new Date(Math.min(end === Infinity ? Date.now() : end, Date.now())).toISOString().slice(0, 10);
+  const daily = (cache && cache.daily) || {};
+  for (const [day, d] of Object.entries(daily)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day < dayFrom || day > dayTo) continue;
+    out.totalVisits += Number(d.visits) || 0;
+    for (const [src, v] of Object.entries(d.sources || {})) {
+      out.visitsBySource[src] = (out.visitsBySource[src] || 0) + (Number(v.visits) || 0);
+      out.signupsBySource[src] = (out.signupsBySource[src] || 0) + (Number(v.signups) || 0);
+    }
+    for (const [lp, v] of Object.entries(d.landing || {})) {
+      out.landing[lp] = (out.landing[lp] || 0) + (Number(v.visits) || 0);
+    }
+  }
+  return out;
 }
 
 function applySourceFilterFromTraffic(source) {
