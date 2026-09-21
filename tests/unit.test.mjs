@@ -82,6 +82,14 @@ test("legacy positive rating field honoured", () => {
   assertEq(getAverageRating({ rating: 4 }), 4);
 });
 
+test("download renderer uses direct browser hand-off without download attribute", () => {
+  const app = apps.find((a) => a.key === "-Test0001keyAAA");
+  const vm = buildAppViewModel(app, { allApps: apps, slugIndex: index });
+  const html = renderAppDetailInner(vm);
+  assertIncludes(html, 'data-download-key="-Test0001keyAAA"');
+  assertNotIncludes(html, ' download ');
+});
+
 // ============ UPDATE CHECKER (§69 matrix) ============
 suite("Update checker");
 test("installed 10, website 11 → update prompt", () => {
