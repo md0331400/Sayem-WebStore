@@ -156,3 +156,50 @@ profiles × 4 font scales × 8 routes = 0 overflow findings, and a live-producti
   without a manual refresh) is proven end-to-end by
   `tests/responsive.test.mjs › old v13 client adopts the new build on next visit`; the
   production bundle contains the same lifecycle code verified above.
+
+---
+
+## 7. Addendum — v4.3 (commit `90d4add`): the "tiny UI + clipped rows" report
+
+After the v4.2 release, real-device screenshots still showed (a) rows clipped at the right
+edge and (b) a shell that occupied only ~80% of the visible screen. Re-investigation with
+bounding-box measurement on the LIVE detail pages found one additional root cause plus one
+user-side amplifier:
+
+**Cause 11 (overflow, confirmed by measurement):** `.app-detail-layout` is a CSS grid with an
+*implicit `auto` column*. Measured on production before the fix (360 px viewport,
+`/game/samva-online-tic-tac-toe`): `document.scrollWidth = 497`; the column track computed to
+`472px`, and `.app-detail-hero`, `.app-stats`, `.app-desc`, `.detail-actions` and
+`.screenshots-scroll` all rendered 472 px wide inside a 340 px container. The track's
+min-content contributor is the screenshot rail: a horizontal scroll container does **not**
+shrink its intrinsic (min-content) contribution — six fixed-width thumbs ≈ 472 px — and an
+`auto` track honours that floor. Content-poor apps (2 screenshots, the shape used by earlier
+fixtures and by the slugs sampled in the first live pass) stay below the viewport, which is
+why earlier matrices read clean.
+**Fix:** explicit `grid-template-columns: minmax(0, 1fr)` on `.app-detail-layout` (plus
+`min-width:0; max-width:100%` on its children), capped second column on `.app-detail-hero`,
+`min-width:0` on `.screenshots-scroll`, and pre-emptive caps on the other wide implicit-auto
+grids (`.app-info-table`, `.reviews-list`, `.auth-benefits`, `.update-banner`). The rail still
+scrolls internally; nothing was hidden or scaled.
+
+**Cause 12 (perceived "tiny UI", user-side amplifier):** the device's Chrome held a per-site
+page-zoom of ≈85% (visual viewport ≈423 CSS px while the layout viewport stayed 360). The
+340–360 px shell then painted onto ~80% of the visible area with the page background showing
+as a dark band on the right, and the 472 px rows ran under the screen edge — exactly the
+"zoomed-out desktop canvas" appearance. No `zoom`, `transform: scale`, fixed desktop canvas or
+viewport override exists in the codebase (verified by scan and by computed-style probes);
+after Cause 11 is fixed there is no reason to pinch-zoom, and resetting the site zoom to 100%
+(Chrome menu → zoom) restores full-size rendering. Condition-B guard added to the regression
+suite: every route now also asserts the shell width ≥ viewport − 48 px, so a shrink-wrapped
+"desktop canvas" can never pass the tests again.
+
+**Regression coverage added:** fixture game now carries five screenshots (live shape), so the
+whole matrix (16 viewports × 8 routes × font scales) exercises the rail; the offender walker
+additionally reports shell narrowness; the SW deploy-transition test is version-agnostic.
+
+**Re-verification after deploy of `90d4add`:** the two URLs from the user's screenshots
+(`/game/samva-online-tic-tac-toe`, `/app/ami-ai`) plus home pass 21/21 checks at
+320/360/360×780/375/390/412/430 (dark theme, real mobile emulation): `scrollWidth == viewport`,
+zero offenders, shell == viewport; live full matrix (`LIVE_SLUGS=1 FONT_ALL=1`) 160/160 clean;
+local suites unit 61 / functions 19 / e2e 38 / responsive 30 = 148 passed; SW now
+`sayem-static-v15`.

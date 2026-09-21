@@ -66,7 +66,9 @@ const DIAG = () => {
     if (r.right <= vw + 1 && r.left >= -1) return;
     let p = el.parentElement;
     while (p && p !== document.body) {
-      if (isScroller(p) || getComputedStyle(p).position === "fixed") return; // contained / off-canvas by design
+      const ps = getComputedStyle(p);
+      // contained by design: internal scroller, clipped carousel viewport, or off-canvas fixed shell
+      if (isScroller(p) || ps.position === "fixed" || ps.overflowX === "hidden" || ps.overflowX === "clip") return;
       p = p.parentElement;
     }
     bad.push(`${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}${typeof el.className === "string" && el.className ? "." + el.className.trim().split(/\s+/)[0] : ""}[right=${Math.round(r.right)}]`);
