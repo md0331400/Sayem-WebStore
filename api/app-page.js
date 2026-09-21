@@ -198,7 +198,7 @@ module.exports = async function handler(req, res) {
 
   const index = utils.buildAppSlugIndex(apps);
   const appKey = index.bySlug.get(slug);
-  const app = appKey ? apps.find((a) => a.key === appKey) : null;
+  const app = appKey ? apps.find((a) => a.key === appKey && a.published !== false) : null;
 
   // ---- Unknown slug → real 404 (never show an unrelated app) ----
   if (!app) {
@@ -231,7 +231,7 @@ module.exports = async function handler(req, res) {
   });
 
   const ogImage =
-    app.imageUrl && String(app.imageUrl).startsWith("http") ? String(app.imageUrl) : `${PROD_ORIGIN}/icons/icon-512.png`;
+    utils.isSafeAssetUrl(app.imageUrl) ? String(app.imageUrl) : `${PROD_ORIGIN}/icons/icon-512.png`;
   const ogTitle = `${app.name || vm.typeLabel} — ${vm.typeLabel} Download | ${siteName}`;
   const jsonLd = utils.appJsonLd(vm);
   const inner = utils.renderAppDetailInner(vm);
