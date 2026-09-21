@@ -871,6 +871,12 @@ function updateHeaderUser() {
   }
 }
 
+function menuIconHtml(src, alt = "") {
+  const path = String(src || "");
+  if (!path) return "";
+  return `<img class="nav-icon-gif" src="${escapeHtml(path)}" alt="${escapeHtml(alt)}" width="28" height="28" loading="lazy" decoding="async">`;
+}
+
 function buildSideMenu() {
   const nav = $("sideNav");
   const footer = $("sideFooter");
@@ -888,22 +894,22 @@ function buildSideMenu() {
   footer.innerHTML = "";
 
   const items = [
-    { label: "Home", icon: "🏠", path: "/" },
-    { label: "Games", icon: "🎮", path: "/games" },
-    { label: "Apps", icon: "📱", path: "/apps" },
-    { label: "FAQ", icon: "❓", path: "/faq" },
-    { label: "Disclaimer", icon: "⚠️", path: "/disclaimer" },
-    { label: "Terms of Use", icon: "📄", path: "/terms" },
-    { label: "Privacy Policy", icon: "🔒", path: "/privacy" },
-    { label: "Report Us", icon: "📣", action: openReport },
-    { label: "About", icon: "ℹ️", action: openAbout },
-    { label: getSavedTheme() === "dark" ? "Switch to Light" : "Switch to Dark", icon: getSavedTheme() === "dark" ? "☀️" : "🌙", action: toggleTheme }
+    { label: "Home", icon: null, path: "/" },
+    { label: "Games", icon: "icons/video-game.gif", path: "/games" },
+    { label: "Apps", icon: "icons/checklist.gif", path: "/apps" },
+    { label: "FAQ", icon: null, path: "/faq" },
+    { label: "Disclaimer", icon: "icons/broken-link.gif", path: "/disclaimer" },
+    { label: "Terms of Use", icon: "icons/checklist.gif", path: "/terms" },
+    { label: "Privacy Policy", icon: "icons/lock.gif", path: "/privacy" },
+    { label: "Report Us", icon: "icons/report.gif", action: openReport },
+    { label: "About", icon: "icons/support.gif", action: openAbout },
+    { label: getSavedTheme() === "dark" ? "Switch to Light" : "Switch to Dark", icon: getSavedTheme() === "dark" ? "icons/sun.gif" : "icons/night.gif", action: toggleTheme }
   ];
 
   items.forEach((item) => {
     const btn = document.createElement("button");
     btn.className = "nav-item";
-    btn.innerHTML = `<span class="nav-icon">${item.icon}</span>${item.label}`;
+    btn.innerHTML = `<span class="nav-icon">${item.icon ? menuIconHtml(item.icon, item.label) : ""}</span>${item.label}`;
     btn.onclick = () => {
       if (item.path) navigate(item.path);
       else if (item.action) item.action();
