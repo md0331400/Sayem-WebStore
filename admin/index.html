@@ -2302,18 +2302,8 @@ async function loadSettingsDisplay() {
 }
 
 // ============ INIT ============
-onAuthStateChanged(window._auth, async (authUser) => {
-  if (!authUser || !firebaseReady) {
-    if (!authUser && firebaseReady) {
-      currentAdminKey = null;
-      sessionStorage.removeItem('admin_logged_in');
-      sessionStorage.removeItem('admin_key');
-      document.getElementById('loginPage').style.display = 'flex';
-      document.getElementById('adminDashboard').style.display = 'none';
-    }
-    return;
-  }
-
+async function restoreAdminSession(authUser) {
+  if (!authUser || !firebaseReady) return false;
   try {
     const mapSnap = await window._get(window._ref(window._db, 'adminUids/' + authUser.uid));
     if (mapSnap.exists()) {
@@ -2321,7 +2311,7 @@ onAuthStateChanged(window._auth, async (authUser) => {
       const adminKey = typeof mapped === 'string' ? mapped : String(mapped?.adminKey || '');
       if (adminKey) {
         await openAdminDashboard(adminKey);
-        return;
+        return true;
       }
     }
 
@@ -2330,7 +2320,7 @@ onAuthStateChanged(window._auth, async (authUser) => {
     let matchedKey = null;
     if (snap.exists()) snap.forEach(c => {
       const a = c.val() || {};
-      if (a.uid === authUser.uid) matchedKey = c.key;
+      if (a.uid === authUser.uid && a.blocked !== true) matchedKey = c.key;
     });
     if (matchedKey) {
       currentAdminKey = matchedKey;
@@ -2339,27 +2329,46 @@ onAuthStateChanged(window._auth, async (authUser) => {
       document.getElementById('loginPage').style.display='none';
       document.getElementById('adminDashboard').style.display='block';
       loadAll();
-    } else {
-      try { await signOut(window._auth); } catch {}
-      currentAdminKey = null;
-      sessionStorage.clear();
-      document.getElementById('loginPage').style.display='flex';
-      document.getElementById('adminDashboard').style.display='none';
-      toast('This Firebase account is not registered as an admin.', 'error');
+      return true;
     }
+
+    try { await signOut(window._auth); } catch {}
+    currentAdminKey = null;
+    sessionStorage.clear();
+    document.getElementById('loginPage').style.display='flex';
+    document.getElementById('adminDashboard').style.display='none';
+    return false;
   } catch(e) {
     console.warn('Admin auth restore failed:',e);
     currentAdminKey = null;
     sessionStorage.clear();
     document.getElementById('loginPage').style.display='flex';
     document.getElementById('adminDashboard').style.display='none';
+    return false;
+  }
+}
+
+onAuthStateChanged(window._auth, async (authUser) => {
+  if (!firebaseReady) return;
+  if (authUser) {
+    const restored = await restoreAdminSession(authUser);
+    if (!restored) toast('This Firebase account is not registered as an admin.', 'error');
+  } else {
+    currentAdminKey = null;
+    sessionStorage.removeItem('admin_logged_in');
+    sessionStorage.removeItem('admin_key');
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('adminDashboard').style.display = 'none';
   }
 });
+
 window.addEventListener('firebaseReady', async () => {
   firebaseReady = true;
   console.log('✅ Firebase connected');
   // Never trust admin sessionStorage alone. Firebase Auth must confirm the session.
-  if (!window._auth?.currentUser) {
+  if (window._auth?.currentUser) {
+    await restoreAdminSession(window._auth.currentUser);
+  } else {
     document.getElementById('loginPage').style.display = 'flex';
     document.getElementById('adminDashboard').style.display = 'none';
   }
