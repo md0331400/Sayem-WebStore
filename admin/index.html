@@ -262,7 +262,10 @@
         <div class="dash-card">
           <div class="dash-card-title">
             <span>📋 Activity Log</span>
-            <button class="btn btn-warning btn-xs" id="btnClearAllActivity">🗑 Clear All</button>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn btn-outline btn-xs" id="btnExportBackup">💾 Export Backup</button>
+              <button class="btn btn-warning btn-xs" id="btnClearAllActivity">🗑 Clear All</button>
+            </div>
           </div>
           <div class="activity-list" id="activityLogContainer"><div class="spinner"></div></div>
         </div>
@@ -553,6 +556,7 @@
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import{getDatabase,ref,push,set,get,remove,update}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 const firebaseConfig={
   apiKey:"AIzaSyDo4VtvFjkHK_qPKw_8OvjWB3DF93m0_vE",
   authDomain:"samva-app-store.firebaseapp.com",
@@ -563,8 +567,8 @@ const firebaseConfig={
   appId:"1:42570449631:web:0c81be27dc888a97db9f6a"
 };
 const app=initializeApp(firebaseConfig);
-const db=getDatabase(app);
-window._db=db;window._ref=ref;window._push=push;window._set=set;window._get=get;window._remove=remove;window._update=update;
+const db=getDatabase(app);const auth=getAuth(app);
+window._db=db;window._auth=auth;window._ref=ref;window._push=push;window._set=set;window._get=get;window._remove=remove;window._update=update;
 window.dispatchEvent(new Event('firebaseReady'));
 </script>
 
@@ -760,6 +764,7 @@ document.addEventListener('click', function (e) {
   if (id === 'btnUpdateAdmin' || target.closest('#btnUpdateAdmin')) { updateAdmin(); return; }
   if (id === 'btnSaveSettings' || target.closest('#btnSaveSettings')) { saveSettings(); return; }
   if (id === 'btnSaveEdit' || target.closest('#btnSaveEdit')) { saveEditApp(); return; }
+  if (id === 'btnExportBackup' || target.closest('#btnExportBackup')) { exportBackup(); return; }
 
   // ===== Ads Manager buttons =====
   if (id === 'btnAddAd' || target.closest('#btnAddAd')) { addAd(); return; }
@@ -850,7 +855,7 @@ document.addEventListener('input', function (e) {
   }
 });
 
-// ============ PANELS ============
+async function exportBackup() {,  if (!firebaseReady) { toast('Not connected to Firebase.', 'error'); return; },  try {,    const results = await Promise.all([,      window._get(window._ref(window._db,'apps')), window._get(window._ref(window._db,'users')),,      window._get(window._ref(window._db,'settings')), window._get(window._ref(window._db,'ads')),    ]);,    const users = [];,    if (results[1].exists()) results[1].forEach(child => { const u={...(child.val()||{}),key:child.key}; delete u.password; users.push(u); });,    const payload={exportedAt:new Date().toISOString(),schemaVersion:2,apps:results[0].exists()?results[0].val():{},users,settings:results[2].exists()?results[2].val():{},ads:results[3].exists()?results[3].val():{}};,    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});,    const url=URL.createObjectURL(blob); const a=document.createElement('a');,    a.href=url; a.download='sayem-webstore-backup-'+new Date().toISOString().slice(0,10)+'.json';,    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);,    await logActivity('💾 Exported Backup','Passwords excluded'); toast('Backup exported. Passwords were excluded.','success');,  } catch(e) { console.error(e); toast('Backup export failed.','error'); },},// ============ PANELS ============
 function showPanel(id) {
   document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
@@ -1039,33 +1044,37 @@ async function loadAdLeaders() {
 
 // ============ AUTH ============
 async function doAdminLogin() {
-  const u = document.getElementById('adminUser').value.trim();
-  const p = document.getElementById('adminPass').value;
+  const u = document.getElementById('adminUser').value.trim(); const p = document.getElementById('adminPass').value;
   if (!u || !p) { toast('Fill all fields', 'error'); return; }
   if (!firebaseReady) { toast('Connecting to server...', 'info'); return; }
   try {
-    const snap = await window._get(window._ref(window._db, 'admins'));
-    if (snap.exists()) {
-      let found = false, fk = null;
-      snap.forEach(c => {
-        const a = c.val();
-        if ((a.username === u || a.email === u) && a.password === p) { found = true; fk = c.key; }
-      });
-      if (found) {
-        currentAdminKey = fk;
-        sessionStorage.setItem('admin_logged_in', 'true');
-        sessionStorage.setItem('admin_key', fk);
-        document.getElementById('loginPage').style.display = 'none';
-        document.getElementById('adminDashboard').style.display = 'block';
-        toast('Welcome Admin! 🎉', 'success');
-        loadAll();
-        await logActivity('🔐 Admin Login');
-      } else { toast('Invalid credentials!', 'error'); }
-    } else { toast('No admin accounts found!', 'error'); }
-  } catch (e) { toast('Error: ' + e.message, 'error'); }
+    const snap = await window._get(window._ref(window._db, 'admins')); let found = null;
+    if (snap.exists()) snap.forEach(c => { const a = c.val() || {}; if (a.username === u || String(a.email || '').toLowerCase() === u.toLowerCase()) found = { ...a, key:c.key }; });
+    const authEmail = found?.email ? String(found.email).toLowerCase() : (u.includes('@') ? u.toLowerCase() : '');
+    if (authEmail) {
+      try {
+        const cred = await signInWithEmailAndPassword(window._auth, authEmail, p);
+        if (!found) { toast('Admin profile not found.', 'error'); return; }
+        await window._update(window._ref(window._db, 'admins/' + found.key), { uid: cred.user.uid, authProvider:'password', password:null });
+        delete found.password; found.uid = cred.user.uid;
+        currentAdminKey = found.key; sessionStorage.setItem('admin_logged_in','true'); sessionStorage.setItem('admin_key',found.key);
+        document.getElementById('loginPage').style.display='none'; document.getElementById('adminDashboard').style.display='block';
+        toast('Welcome Admin! 🎉','success'); loadAll(); await logActivity('🔐 Admin Login'); return;
+      } catch (authError) { console.warn('Admin Auth login failed:', authError?.code || 'unknown'); }
+    }
+    if (!found || found.password !== p) { toast('Invalid admin credentials!', 'error'); return; }
+    if (found.email && !found.uid) {
+      try { const cred = await createUserWithEmailAndPassword(window._auth, String(found.email).toLowerCase(), p); await window._update(window._ref(window._db, 'admins/' + found.key), { uid:cred.user.uid, authProvider:'password', password:null }); found.uid=cred.user.uid; }
+      catch (migrationError) { console.warn('Admin legacy migration skipped:', migrationError?.code || 'unknown'); }
+    }
+    delete found.password;
+    currentAdminKey = found.key; sessionStorage.setItem('admin_logged_in','true'); sessionStorage.setItem('admin_key',found.key);
+    document.getElementById('loginPage').style.display='none'; document.getElementById('adminDashboard').style.display='block';
+    toast('Welcome Admin! 🎉','success'); loadAll(); await logActivity('🔐 Admin Login');
+  } catch(e) { console.error(e); toast('Login failed. Please check your connection and try again.', 'error'); }
 }
-
-function adminLogout() {
+async function adminLogout() {
+  try { if (window._auth?.currentUser) await signOut(window._auth); } catch(e) { console.warn(e); }
   sessionStorage.clear();
   currentAdminKey = null;
   document.getElementById('loginPage').style.display = 'flex';
@@ -2078,6 +2087,13 @@ async function loadSettingsDisplay() {
 }
 
 // ============ INIT ============
+onAuthStateChanged(window._auth, async (authUser) => {
+  if (!authUser || !firebaseReady) return;
+  try {
+    const snap=await window._get(window._ref(window._db,'admins'));
+    if (snap.exists()) snap.forEach(c => { const a=c.val()||{}; if(a.uid===authUser.uid){ currentAdminKey=c.key; sessionStorage.setItem('admin_logged_in','true'); sessionStorage.setItem('admin_key',c.key); } });
+  } catch(e) { console.warn('Admin auth restore failed:',e); }
+});
 window.addEventListener('firebaseReady', async () => {
   firebaseReady = true;
   console.log('✅ Firebase connected');
