@@ -84,7 +84,7 @@
     <span id="installBannerText">Install for quick access and offline-ready loading.</span>
   </div>
   <div class="install-banner-actions">
-    <button class="btn btn-primary btn-sm" id="bannerInstallBtn" onclick="triggerInstallPrompt()">⬇️ Install App</button>
+    <button class="btn btn-primary btn-sm" id="bannerInstallBtn" onclick="triggerInstallPrompt()"><img src="/icons/download.gif" alt="" width="18" height="18" class="ui-gif-icon"> Install App</button>
     <button class="btn btn-ghost btn-sm" onclick="dismissInstallBanner()">Not now</button>
   </div>
 </div>
@@ -110,8 +110,8 @@
     <div class="nav-actions">
       <div class="header-user" id="headerUser" style="display:none;"></div>
       <button class="icon-btn" onclick="openSearch()" aria-label="Search apps and games">🔍</button>
-      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Switch to dark mode">🌙</button>
-      <button class="btn btn-primary nav-auth-btn" id="headerLoginBtn" onclick="showPage('authPage')">🔑 Login</button>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Switch to dark mode"><img src="/icons/night.gif" alt="" width="20" height="20" class="ui-gif-icon"></button>
+      <button class="btn btn-primary nav-auth-btn" id="headerLoginBtn" onclick="showPage('authPage')"><img src="/icons/key.gif" alt="" width="20" height="20" class="ui-gif-icon"> Login</button>
     </div>
   </div>
 </header>
@@ -275,7 +275,7 @@
 <div id="gamesPage" class="page">
   <div class="container page-container">
     <div class="section-header section-header-wrap">
-      <h1 class="section-title">🎮 Games</h1>
+      <h1 class="section-title"><img src="/icons/video-game.gif" alt="" width="28" height="28" class="ui-gif-icon"> Games</h1>
       <span class="section-meta" id="gamesCount"></span>
     </div>
     <div class="category-filters" id="gamesCategoryFilters"></div>
@@ -288,7 +288,7 @@
 <div id="appsPage" class="page">
   <div class="container page-container">
     <div class="section-header section-header-wrap">
-      <h1 class="section-title">📱 Apps</h1>
+      <h1 class="section-title"><img src="/icons/checklist.gif" alt="" width="28" height="28" class="ui-gif-icon"> Apps</h1>
       <span class="section-meta" id="appsPageCount"></span>
     </div>
     <div class="category-filters" id="appsCategoryFilters"></div>
