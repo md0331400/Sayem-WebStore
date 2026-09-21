@@ -90,7 +90,7 @@ test("download renderer uses direct browser hand-off without download attribute"
   assertNotIncludes(html, ' download ');
 });
 
-// ============ UPDATE CHECKER (§69 matrix) ============
+test("app card has no View & Download CTA", () => {\n  const app = apps.find((a) => a.key === "-Test0001keyAAA");\n  const html = appCardHtml(app, getAppPath(app, index));\n  assertNotIncludes(html, "View &amp; Download");\n});\n\n// ============ UPDATE CHECKER (§69 matrix) ============
 suite("Update checker");
 test("installed 10, website 11 → update prompt", () => {
   const r = resolveUpdateStatus(10, 11);
