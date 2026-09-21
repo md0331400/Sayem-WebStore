@@ -96,6 +96,8 @@ const APP_CACHE_SEED = { samweb_cached_apps_v3: JSON.stringify(apps) };
 async function installSpies(page) {
   await page.evaluate(() => {
     window.__writes = [];
+    window._createUserWithEmailAndPassword = (auth, email, pass) => Promise.resolve({ user: { uid: "-SpyAuthUid", email } });
+    window._signInWithEmailAndPassword = (auth, email, pass) => Promise.resolve({ user: { uid: "-SpyAuthUid", email } });
     window.__txCount = 0;
     window._ref = (db, p) => ({ path: String(p), toString: () => String(p) });
     window._push = (r) => ({ path: `${r.path}/-SpyPush1`, key: "-SpyPush1", toString: () => `${r.path}/-SpyPush1` });
@@ -187,8 +189,24 @@ console.log(`E2E against ${DEV} (firebase/ad hosts dead-ended; writes are spies)
 
 try {
   // ============ HOMEPAGE ============
-  await test("app cards have no View & Download CTA", async () => {\n    const { page, context } = await newPage(APP_CACHE_SEED);\n    await page.goto(DEV + "/", { waitUntil: "domcontentloaded" });\n    await page.waitForSelector("#appsGrid a.app-card", { timeout: 10000 });\n    const ctaCount = await page.$eval("#appsGrid .app-download-btn", (els) => els.length);\n    assertEq(ctaCount, 0, "app cards have no extra CTA");\n    await context.close();\n  });\n\n
-  await test("hero banner has swipe-only navigation", async () => {\n    const { page, context } = await newPage(APP_CACHE_SEED);\n    await page.goto(DEV + "/", { waitUntil: "domcontentloaded" });\n    await page.waitForSelector("#featureBanner .banner-slide", { timeout: 10000 });\n    const controls = await page.$eval("#featureBanner .banner-nav, #featureBanner .banner-dots", (els) => els.length);\n    assertEq(controls, 0, "no manual slider controls");\n    await context.close();\n  });\n\n
+  await test("app cards have no View & Download CTA", async () => {
+    const { page, context } = await newPage(APP_CACHE_SEED);
+    await page.goto(DEV + "/", { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#appsGrid a.app-card", { timeout: 10000 });
+    const ctaCount = await page.$$eval("#appsGrid .app-download-btn", (els) => els.length);
+    assertEq(ctaCount, 0, "app cards have no extra CTA");
+    await context.close();
+  });
+
+  await test("hero banner has swipe-only navigation", async () => {
+    const { page, context } = await newPage(APP_CACHE_SEED);
+    await page.goto(DEV + "/", { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#featureBanner .banner-slide", { timeout: 10000 });
+    const controls = await page.$$eval("#featureBanner .banner-nav, #featureBanner .banner-dots", (els) => els.length);
+    assertEq(controls, 0, "no manual slider controls");
+    await context.close();
+  });
+
   suite("Homepage & branding");
   await test("home renders Sayem WebStore with production SEO head", async () => {
     const { page, context } = await newPage(APP_CACHE_SEED);
