@@ -872,8 +872,9 @@ function updateHeaderUser() {
 }
 
 function menuIconHtml(src, alt = "") {
-  const path = String(src || "");
-  if (!path) return "";
+  const rawPath = String(src || "");
+  if (!rawPath) return "";
+  const path = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
   return `<img class="nav-icon-gif" src="${escapeHtml(path)}" alt="${escapeHtml(alt)}" width="28" height="28" loading="lazy" decoding="async">`;
 }
 
