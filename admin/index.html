@@ -2254,8 +2254,9 @@ async function sendAdminPasswordReset() {
     await sendPasswordResetEmail(window._auth, email);
     toast('Password reset email sent. Check the admin inbox.', 'success', 5000);
   } catch (e) {
-    const msg = e?.code === 'auth/invalid-email' ? 'Enter a valid admin email address.' : 'Could not send reset email.';
-    toast(msg, 'error', 5000);
+    const code = e?.code || '';
+    const msg = code === 'auth/invalid-email' ? 'Enter a valid admin email address.' : 'If that admin email is registered, a reset email was sent.';
+    toast(msg, code === 'auth/invalid-email' ? 'error' : 'success', 5000);
   }
 }
 async function saveSettings() {
