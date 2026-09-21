@@ -1146,12 +1146,10 @@ async function sendPasswordReset() {
     toast("Password reset email sent. Check your inbox.", "success", 5000);
   } catch (e) {
     const code = e?.code || "";
-    const msg = code === "auth/user-not-found"
-      ? "No account was found for that email."
-      : code === "auth/invalid-email"
+    const msg = code === "auth/invalid-email"
       ? "Please enter a valid email address."
-      : "Could not send the reset email. Please try again.";
-    toast(msg, "error", 5000);
+      : "If an account exists for that email, a password reset email was sent.";
+    toast(msg, code === "auth/invalid-email" ? "error" : "success", 5000);
   }
 }
 window.sendPasswordReset = sendPasswordReset;
