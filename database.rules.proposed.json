@@ -7,7 +7,8 @@
         ".write": "auth != null && root.child('adminUids').child(auth.uid).exists()",
         "downloads": {
           ".write": true,
-          "_comment": "Guest download counter writes are isolated to the nested downloads value; client cannot write the rest of the app record."
+          ".validate": "newData.isNumber() && (data.exists() ? data.isNumber() && newData.val() === data.val() + 1 : newData.val() === 1)",
+          "_comment": "Guest download increments are limited to exactly +1; clients cannot arbitrarily overwrite the counter."
         },
         "reviews": {
           "$reviewId": {
@@ -43,13 +44,14 @@
     "reports": {
       ".read": "auth != null && root.child('adminUids').child(auth.uid).exists()",
       "$key": {
-        ".write": "auth != null && (root.child('adminUids').child(auth.uid).exists() || newData.child('userId').val() === auth.uid)"
+        ".write": "auth != null && (root.child('adminUids').child(auth.uid).exists() || newData.child('userId').val() === auth.uid)",
+        ".validate": "newData.hasChildren(['subject','message','userId','timestamp']) && newData.child('subject').isString() && newData.child('subject').val().length <= 200 && newData.child('message').isString() && newData.child('message').val().length <= 5000 && newData.child('userId').isString() && newData.child('timestamp').isNumber()"
       }
     },
     "visitors": {
       ".read": "auth != null && root.child('adminUids').child(auth.uid).exists()",
       "$token": {
-        ".write": true
+        ".write": false
       }
     },
     "adminActivity": {
