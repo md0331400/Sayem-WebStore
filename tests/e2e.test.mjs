@@ -116,7 +116,7 @@ async function installSpies(page) {
     };
     window._runTransaction = (r, fn) => {
       window.__txCount += 1;
-      try { fn({ downloads: 1 }); } catch {}
+      try { fn(1); } catch {}
       return Promise.resolve();
     };
     window._get = (r) =>
