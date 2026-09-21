@@ -867,7 +867,44 @@ document.addEventListener('input', function (e) {
   }
 });
 
-async function exportBackup() {,  if (!firebaseReady) { toast('Not connected to Firebase.', 'error'); return; },  try {,    const results = await Promise.all([,      window._get(window._ref(window._db,'apps')), window._get(window._ref(window._db,'users')),,      window._get(window._ref(window._db,'settings')), window._get(window._ref(window._db,'ads')),    ]);,    const users = [];,    if (results[1].exists()) results[1].forEach(child => { const u={...(child.val()||{}),key:child.key}; delete u.password; users.push(u); });,    const payload={exportedAt:new Date().toISOString(),schemaVersion:2,apps:results[0].exists()?results[0].val():{},users,settings:results[2].exists()?results[2].val():{},ads:results[3].exists()?results[3].val():{}};,    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});,    const url=URL.createObjectURL(blob); const a=document.createElement('a');,    a.href=url; a.download='sayem-webstore-backup-'+new Date().toISOString().slice(0,10)+'.json';,    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);,    await logActivity('💾 Exported Backup','Passwords excluded'); toast('Backup exported. Passwords were excluded.','success');,  } catch(e) { console.error(e); toast('Backup export failed.','error'); },},// ============ PANELS ============
+async function exportBackup() {
+  if (!firebaseReady) { toast('Not connected to Firebase.', 'error'); return; }
+  try {
+    const appsSnap = await window._get(window._ref(window._db, 'apps'));
+    const usersSnap = await window._get(window._ref(window._db, 'users'));
+    const settingsSnap = await window._get(window._ref(window._db, 'settings'));
+    const adsSnap = await window._get(window._ref(window._db, 'ads'));
+    const users = [];
+    if (usersSnap.exists()) usersSnap.forEach(child => {
+      const u = { ...(child.val() || {}), key: child.key };
+      delete u.password;
+      users.push(u);
+    });
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      schemaVersion: 2,
+      apps: appsSnap.exists() ? appsSnap.val() : {},
+      users,
+      settings: settingsSnap.exists() ? settingsSnap.val() : {},
+      ads: adsSnap.exists() ? adsSnap.val() : {},
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sayem-webstore-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    await logActivity('💾 Exported Backup', 'Passwords excluded');
+    toast('Backup exported. Passwords were excluded.', 'success');
+  } catch (e) {
+    console.error(e);
+    toast('Backup export failed.', 'error');
+  }
+}
+// ============ PANELS ============
 function showPanel(id) {
   document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
