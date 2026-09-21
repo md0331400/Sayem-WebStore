@@ -301,6 +301,16 @@
           <div class="input-group" style="margin-bottom:10px;"><label>Package Name</label><input id="aPackageName" placeholder="com.example.app"></div>
         </div>
         <div class="input-group" style="margin-bottom:10px;"><label>Description *</label><textarea id="aDesc" rows="2" placeholder="Describe the app..."></textarea></div>
+        <div class="form-cols-2">
+          <div class="input-group" style="margin-bottom:10px;"><label>Developer</label><input id="aDeveloper" placeholder="Developer / Publisher"></div>
+          <div class="input-group" style="margin-bottom:10px;"><label>File Size</label><input id="aFileSize" placeholder="25 MB"></div>
+          <div class="input-group" style="margin-bottom:10px;"><label>Minimum Android</label><input id="aMinAndroid" placeholder="Android 8.0+"></div>
+          <div class="input-group" style="margin-bottom:10px;"><label>Changelog</label><input id="aChangelog" placeholder="What's new in this version?"></div>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 14px;">
+          <label style="display:flex;align-items:center;gap:7px;"><input id="aPublished" type="checkbox" checked> Published</label>
+          <label style="display:flex;align-items:center;gap:7px;"><input id="aFeatured" type="checkbox"> Featured in hero</label>
+        </div>
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📸 App Screenshots (optional)</div>
         <div class="form-cols-2">
           <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 1</label><input id="aScreen1" placeholder="https://..."></div>
@@ -764,6 +774,8 @@ document.addEventListener('click', function (e) {
   if (id === 'btnUpdateAdmin' || target.closest('#btnUpdateAdmin')) { updateAdmin(); return; }
   if (id === 'btnSaveSettings' || target.closest('#btnSaveSettings')) { saveSettings(); return; }
   if (id === 'btnSaveEdit' || target.closest('#btnSaveEdit')) { saveEditApp(); return; }
+  if (id.startsWith('pubAppBtn_')) { toggleAppPublished(id.replace('pubAppBtn_','')); return; }
+  if (id.startsWith('featAppBtn_')) { toggleAppFeatured(id.replace('featAppBtn_','')); return; }
   if (id === 'btnExportBackup' || target.closest('#btnExportBackup')) { exportBackup(); return; }
 
   // ===== Ads Manager buttons =====
@@ -1150,7 +1162,12 @@ async function addApp() {
   const img = document.getElementById('aImageUrl').value.trim();
   const lk = document.getElementById('aLink').value.trim();
   const d = document.getElementById('aDesc').value.trim();
-  const vn = document.getElementById('aVersionName').value.trim();
+  const vn = document.getElementById('aVersionName').value.trim();  const developerName = document.getElementById('aDeveloper').value.trim();
+  const fileSize = document.getElementById('aFileSize').value.trim();
+  const minAndroid = document.getElementById('aMinAndroid').value.trim();
+  const changelog = document.getElementById('aChangelog').value.trim();
+  const published = document.getElementById('aPublished').checked;
+  const featured = document.getElementById('aFeatured').checked;
   const vcRaw = document.getElementById('aVersionCode').value.trim();
   const pkg = document.getElementById('aPackageName').value.trim();
   const s1 = document.getElementById('aScreen1').value.trim();
@@ -1166,7 +1183,8 @@ async function addApp() {
     if (!Number.isInteger(vc) || vc < 0) { toast('Version Code must be a whole number (e.g. 25)', 'error'); return; }
   }
   if (pkg && !/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(pkg)) { toast('Package Name looks invalid (e.g. com.example.app)', 'error'); return; }
-  const appData = { name: n, icon: ic, imageUrl: img || null, category: c, description: d, link: lk || null, downloadType: lk ? 'direct' : null, downloads: 0, createdAt: Date.now() };
+  const now = Date.now();
+  const appData = { name: n, icon: ic, imageUrl: img || null, category: c, description: d, link: lk || null, downloadType: lk ? 'direct' : null, downloads: 0, createdAt: now, updatedAt: now, published, featured, developerName: developerName || null, fileSize: fileSize || null, minAndroid: minAndroid || null, changelog: changelog || null };
   appData.versionName = vn || null;
   appData.versionCode = vc;
   appData.packageName = pkg || null;
@@ -1179,7 +1197,7 @@ async function addApp() {
     await window._set(window._push(window._ref(window._db, 'apps')), appData);
     toast('✅ App added successfully!', 'success');
     await logActivity('➕ Added App', n);
-    ['aName','aImageUrl','aDesc','aLink','aVersionName','aVersionCode','aPackageName','aScreen1','aScreen2','aScreen3','aScreen4','aScreen5'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['aName','aImageUrl','aDesc','aLink','aVersionName','aVersionCode','aPackageName','aDeveloper','aFileSize','aMinAndroid','aChangelog','aScreen1','aScreen2','aScreen3','aScreen4','aScreen5'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     document.getElementById('aIcon').value = '📱';
     loadApps(); updateStats();
   } catch (e) { toast('Error: ' + e.message, 'error'); }
@@ -1209,6 +1227,8 @@ function loadApps() {
         </div>
         <div style="display:flex;gap:6px;">
           <button class="btn btn-outline btn-sm" id="editAppBtn_${c.key}">✏️ Edit</button>
+          <button class="btn btn-sm ${a.published === false ? 'btn-warning' : 'btn-outline'}" id="pubAppBtn_${c.key}">${a.published === false ? '🚫 Unpublished' : '✅ Published'}</button>
+          <button class="btn btn-sm ${a.featured === true ? 'btn-primary' : 'btn-outline'}" id="featAppBtn_${c.key}">${a.featured === true ? '⭐ Featured' : '☆ Feature'}</button>
           <button class="btn btn-danger btn-sm" id="delAppBtn_${c.key}">🗑 Delete</button>
         </div>
       </div>`;
@@ -1255,6 +1275,16 @@ function openEditApp(k) {
         <div class="input-group" style="margin-bottom:10px;"><label>Package Name</label><input id="editPackageName" value="${esc(a.packageName || '')}" placeholder="com.example.app"></div>
       </div>
       <div class="input-group" style="margin-bottom:10px;"><label>Description</label><textarea id="editDesc" rows="2" placeholder="App description...">${esc(a.description || '')}</textarea></div>
+      <div class="form-cols-2">
+        <div class="input-group" style="margin-bottom:10px;"><label>Developer</label><input id="editDeveloper" value="${esc(a.developerName || '')}" placeholder="Developer / Publisher"></div>
+        <div class="input-group" style="margin-bottom:10px;"><label>File Size</label><input id="editFileSize" value="${esc(a.fileSize || '')}" placeholder="25 MB"></div>
+        <div class="input-group" style="margin-bottom:10px;"><label>Minimum Android</label><input id="editMinAndroid" value="${esc(a.minAndroid || '')}" placeholder="Android 8.0+"></div>
+        <div class="input-group" style="margin-bottom:10px;"><label>Changelog</label><input id="editChangelog" value="${esc(a.changelog || '')}" placeholder="What's new"></div>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 14px;">
+        <label style="display:flex;align-items:center;gap:7px;"><input id="editPublished" type="checkbox" ${a.published !== false ? 'checked' : ''}> Published</label>
+        <label style="display:flex;align-items:center;gap:7px;"><input id="editFeatured" type="checkbox" ${a.featured === true ? 'checked' : ''}> Featured in hero</label>
+      </div>
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📸 App Screenshots</div>
       <div class="form-cols-2">
         <div class="input-group" style="margin-bottom:8px;"><label>Screenshot 1</label><input id="editScreen1" value="${esc(a.screenshot1 || '')}" placeholder="https://..."></div>
@@ -1277,7 +1307,12 @@ async function saveEditApp() {
   const img = document.getElementById('editImageUrl')?.value.trim();
   const lk = document.getElementById('editLink')?.value.trim();
   const d = document.getElementById('editDesc')?.value.trim();
-  const vn = document.getElementById('editVersionName')?.value.trim() || '';
+  const vn = document.getElementById('editVersionName')?.value.trim() || '';  const developerName = document.getElementById('editDeveloper')?.value.trim() || '';
+  const fileSize = document.getElementById('editFileSize')?.value.trim() || '';
+  const minAndroid = document.getElementById('editMinAndroid')?.value.trim() || '';
+  const changelog = document.getElementById('editChangelog')?.value.trim() || '';
+  const published = document.getElementById('editPublished')?.checked !== false;
+  const featured = document.getElementById('editFeatured')?.checked === true;
   const vcRaw = document.getElementById('editVersionCode')?.value.trim() || '';
   const pkg = document.getElementById('editPackageName')?.value.trim() || '';
   const s1 = document.getElementById('editScreen1')?.value.trim();
@@ -1295,7 +1330,7 @@ async function saveEditApp() {
   if (pkg && !/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(pkg)) { toast('Package Name looks invalid (e.g. com.example.app)', 'error'); return; }
   // _update() merges: downloads, reviews, createdAt and legacy fields stay untouched.
   const updates = { name: n, category: c, icon: ic, imageUrl: img || null, link: lk || null, downloadType: lk ? 'direct' : null, description: d,
-    versionName: vn || null, versionCode: vc, packageName: pkg || null, updatedAt: Date.now(),
+    versionName: vn || null, versionCode: vc, packageName: pkg || null, developerName: developerName || null, fileSize: fileSize || null, minAndroid: minAndroid || null, changelog: changelog || null, published, featured, updatedAt: Date.now(),
     screenshot1: s1 || null, screenshot2: s2 || null, screenshot3: s3 || null, screenshot4: s4 || null, screenshot5: s5 || null };
   try {
     await window._update(window._ref(window._db, 'apps/' + k), updates);
@@ -1304,6 +1339,20 @@ async function saveEditApp() {
     closeModal('editAppOverlay');
     loadApps();
   } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function toggleAppPublished(k) {
+  try { const snap=await window._get(window._ref(window._db,'apps/'+k)); const a=snap.val(); if(!a)return;
+    const next=a.published===false; await window._update(window._ref(window._db,'apps/'+k),{published:next,updatedAt:Date.now()});
+    await logActivity(next?'✅ Published App':'🚫 Unpublished App',a.name||k); toast(next?'App published.':'App unpublished from public pages.','success'); loadApps(); updateStats();
+  } catch(e){ console.error(e); toast('Could not update app visibility.','error'); }
+}
+
+async function toggleAppFeatured(k) {
+  try { const snap=await window._get(window._ref(window._db,'apps/'+k)); const a=snap.val(); if(!a)return;
+    const next=a.featured!==true; await window._update(window._ref(window._db,'apps/'+k),{featured:next,updatedAt:Date.now()});
+    await logActivity(next?'⭐ Featured App':'☆ Removed Featured App',a.name||k); toast(next?'Added to featured rotation.':'Removed from featured rotation.','success'); loadApps();
+  } catch(e){ console.error(e); toast('Could not update featured state.','error'); }
 }
 
 // ============ USERS ============
