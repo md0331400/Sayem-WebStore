@@ -20,13 +20,15 @@ Cloudflare is intentionally excluded from this checklist for now.
 1. Confirm Firebase Authentication → Email/Password is enabled.
 2. Ensure every trusted admin has a Firebase Auth account.
 3. Ensure each trusted admin profile has its matching `uid`.
-4. Build and verify `/adminUids/{uid}: true` for every trusted admin using a trusted/manual process. Do not make this node client-writable.
+4. Build and verify `/adminUids/{uid}` with the matching `adminKey` for every trusted admin using a trusted/manual process. Do not make this node client-writable.
 5. Allow existing users to migrate through the existing legacy-login upgrade flow.
 6. Monitor migration coverage and identify any remaining profiles without `uid`.
-7. When the legacy client login fallback is no longer needed, remove the plaintext-password comparison path from `app.js` and `admin/index.html`.
-8. Purge all remaining `password` fields from migrated `/users` and `/admins` records.
-9. Review `database.rules.proposed.json` against the final data model.
-10. Deploy the reviewed rules only after the legacy client scans of `/users` and `/admins` have been retired.
+7. Replace the remaining client-side `/users` scan used by phone-number login/signup with a trusted server-side lookup or migrate phone login to Firebase Phone Authentication.
+8. When email-based Auth/profile hydration is fully mapped, retire the remaining full `/users` and `/admins` legacy scans.
+9. Purge all remaining `password` fields from migrated `/users` and `/admins` records.
+10. Review `database.rules.proposed.json` against the final data model.
+
+11. Deploy the reviewed rules only after the legacy client scans of `/users` and `/admins` have been retired.
 
 ## Security checks after migration
 
