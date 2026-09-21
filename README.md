@@ -6,12 +6,12 @@ Apps & Games ডাউনলোড প্ল্যাটফর্ম — Firebas
 
 - 🏠 Premium landing page (hero, featured apps, categories, stats, footer)
 - 🔍 Live search + category filter
-- 🔐 Login / Sign Up (Firebase Realtime Database)
+- 🔐 Login / Sign Up (Firebase Authentication + Realtime Database profile)
 - ⭐ App rating ও user review system
 - ⬇️ Guest downloads + download counter (login ছাড়াই ডাউনলোড; রিভিউ/রেটিং/রিপোর্টের জন্য লগইন লাগবে)
-- 📱 PWA support — Install App button, offline mode, cached data
+- 📱 PWA support — Install App button, offline mode, cached data, update-safe service worker
 - 📣 Report Us ফর্ম (report সরাসরি Firebase-এ যায়)
-- 👤 Visitor tracking (device token ভিত্তিক, duplicate হয় না)
+- 📈 Anonymous aggregate traffic attribution (no IP/fingerprint tracking)
 
 ## 📁 Project Structure
 
@@ -80,7 +80,7 @@ Admin Panel থেকে করা যায়:
 - 📊 **Dashboard** — users, apps, reports, visitors, downloads, reviews, **total & আজকের ad impressions**
 - 🎯 **Ads Manager** — ad add/remove/edit, on/off switch, প্রতিটা ad-এর code দেখা/পরিবর্তন,
   কোন ad কোথায় বসবে (placements), প্রতি slot-এ max কতগুলো ad, per-ad & per-slot impressions
-- ➕ Apps add/edit/delete, 👥 Users, 📊 Reports, 👥 Visitor tracking details
+- ➕ Apps add/edit/delete/publish/feature, rich app metadata, 👥 Users, 📊 Reports, 👥 Legacy visitor archive, 💾 password-free backup export
 - ⚙️ Settings — admin credentials, website name, logo
 
 > 📝 পুরনো **APK download system বাদ দেওয়া হয়েছে** — app টা এখন সম্পূর্ণ PWA,
@@ -146,9 +146,7 @@ source, campaign and signup-question answer with date ranges (today / yesterday 
 A Campaign Link Generator builds and validates tracked URLs for the production
 domain. No per-pageview analytics writes are performed anywhere.
 
-**Security.** See `SECURITY.md` — including the documented plaintext-password issue
-(no destructive migration was performed) and `database.rules.proposed.json`, a
-ruleset to apply **after** migrating to Firebase Auth.
+**Security.** See `SECURITY.md`. New accounts use Firebase Auth, legacy accounts have a transitional migration path, and `database.rules.proposed.json` remains a reviewed draft until trusted admin authorization and legacy reads are retired.
 
 **Tests.** `node tests/unit.test.mjs`, `node tests/functions.test.mjs`,
 `node tests/e2e.test.mjs` — see `tests/README.md`. Local dev server that mirrors the
