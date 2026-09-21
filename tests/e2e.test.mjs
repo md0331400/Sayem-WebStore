@@ -187,6 +187,8 @@ console.log(`E2E against ${DEV} (firebase/ad hosts dead-ended; writes are spies)
 
 try {
   // ============ HOMEPAGE ============
+  await test("app cards have no View & Download CTA", async () => {\n    const { page, context } = await newPage(APP_CACHE_SEED);\n    await page.goto(DEV + "/", { waitUntil: "domcontentloaded" });\n    await page.waitForSelector("#appsGrid a.app-card", { timeout: 10000 });\n    const ctaCount = await page.$eval("#appsGrid .app-download-btn", (els) => els.length);\n    assertEq(ctaCount, 0, "app cards have no extra CTA");\n    await context.close();\n  });\n\n
+  await test("hero banner has swipe-only navigation", async () => {\n    const { page, context } = await newPage(APP_CACHE_SEED);\n    await page.goto(DEV + "/", { waitUntil: "domcontentloaded" });\n    await page.waitForSelector("#featureBanner .banner-slide", { timeout: 10000 });\n    const controls = await page.$eval("#featureBanner .banner-nav, #featureBanner .banner-dots", (els) => els.length);\n    assertEq(controls, 0, "no manual slider controls");\n    await context.close();\n  });\n\n
   suite("Homepage & branding");
   await test("home renders Sayem WebStore with production SEO head", async () => {
     const { page, context } = await newPage(APP_CACHE_SEED);
