@@ -262,6 +262,58 @@ try {
     const o = await fetch(`${DEV}/api/visit`, { method: "OPTIONS" });
     assertEq(o.status, 204);
   });
+  suite("Update-check JSON API (/api/app-update) — future Android app contract");
+  const upd = (qs) => fetch(`${DEV}/api/app-update?${qs}`);
+  await test("CASE 1 installed 20 < latest 25 → updateAvailable true", async () => {
+    const res = await upd("packageName=com.samva.calculator&versionCode=20");
+    assertEq(res.status, 200);
+    assertEq(res.headers.get("content-type").includes("application/json"), true);
+    assertEq(res.headers.get("cache-control"), "no-store");
+    assertEq(res.headers.get("access-control-allow-origin"), "*");
+    const j = await res.json();
+    assertEq(j.found, true);
+    assertEq(j.latestVersionCode, 25);
+    assertEq(j.installedVersionCode, 20);
+    assertEq(j.updateAvailable, true);
+    assertEq(j.downloadType, "direct");
+    assert(String(j.downloadUrl).startsWith("https://"), "direct URL returned unproxied");
+    assert(String(j.appUrl).includes("/app/"), "appUrl present");
+  });
+  await test("CASE 2 equal version → no update", async () => {
+    const j = await (await upd("packageName=com.samva.calculator&versionCode=25")).json();
+    assertEq(j.found, true);
+    assertEq(j.updateAvailable, false);
+    assertEq(j.reason, "up-to-date");
+  });
+  await test("CASE 3 installed newer → no false update", async () => {
+    const j = await (await upd("packageName=com.samva.calculator&versionCode=30")).json();
+    assertEq(j.found, true);
+    assertEq(j.updateAvailable, false);
+    assertEq(j.reason, "newer-installed");
+  });
+  await test("CASE 4 unknown package → found false", async () => {
+    const j = await (await upd("packageName=com.example.unknown&versionCode=1")).json();
+    assertEq(j.found, false);
+    assertEq(j.updateAvailable, false);
+    assertEq(j.reason, "not-listed");
+  });
+  await test("CASE 5 missing/invalid versionCode or package → safe 400 JSON", async () => {
+    for (const qs of ["packageName=com.samva.calculator", "packageName=com.samva.calculator&versionCode=abc", "packageName=com.samva.calculator&versionCode=-3", "versionCode=5", "packageName=javascript:alert(1)&versionCode=1"]) {
+      const res = await upd(qs);
+      assertEq(res.status, 400, `400 for ${qs}`);
+      const j = await res.json();
+      assertEq(j.updateAvailable, undefined);
+      assert(j.error, "error code present");
+    }
+  });
+  await test("method + freshness + no SPA swallow", async () => {
+    const post = await fetch(`${DEV}/api/app-update`, { method: "POST" });
+    assertEq(post.status, 405);
+    const get = await upd("packageName=com.samva.calculator&versionCode=1");
+    assertEq(get.headers.get("cache-control"), "no-store");
+    const body = await get.text();
+    assert(!body.includes("<html"), "JSON only, never an HTML shell");
+  });
 } finally {
   dev.kill("SIGTERM");
   mockFb.close();

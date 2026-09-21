@@ -9,6 +9,7 @@ import {
   getAverageRating,
   getReviewCount,
   resolveUpdateStatus,
+  isSafeDownloadUrl,
   buildAppViewModel,
   renderAppDetailInner,
   renderNotFoundInner,
@@ -396,7 +397,7 @@ test("guest view: login gate, no review form, download anchor open to all", () =
   assertIncludes(html, "login-gate-card");
   assertNotIncludes(html, 'id="reviewText"');
   assertIncludes(html, `href="${calc.link}"`);
-  assertIncludes(html, "handleDownloadClick");
+  assertIncludes(html, "data-download-key"); // delegated handler, no inline JS
   assertIncludes(html, "No login needed");
 });
 test("logged-in view shows stars + review textarea", () => {
@@ -454,14 +455,26 @@ test("related rail links to real paths, excludes self", () => {
   assert(vm.related.every((r) => r.app.key !== calc.key));
   assert(vm.related.every((r) => r.path.startsWith("/app/") || r.path.startsWith("/game/")));
 });
-test("update banner appears only when website versionCode > installed", () => {
+test("website detail page NEVER renders update UI (update UI belongs to the Android app/API)", () => {
   const calc = apps.find((a) => a.key === "-Test0001keyAAA");
-  const vmUp = buildAppViewModel(calc, { allApps: apps, slugIndex: index, installedVersionCode: 10 });
-  assertIncludes(renderAppDetailInner(vmUp), "update-banner");
-  const vmSame = buildAppViewModel(calc, { allApps: apps, slugIndex: index, installedVersionCode: 25 });
-  assertNotIncludes(renderAppDetailInner(vmSame), "update-banner");
-  const vmNewer = buildAppViewModel(calc, { allApps: apps, slugIndex: index, installedVersionCode: 30 });
-  assertNotIncludes(renderAppDetailInner(vmNewer), "update-banner");
+  for (const installedVersionCode of [10, 25, 30, undefined]) {
+    const vm = buildAppViewModel(calc, { allApps: apps, slugIndex: index, installedVersionCode });
+    const html = renderAppDetailInner(vm);
+    assertNotIncludes(html, "update-banner");
+    assertNotIncludes(html, "Update Now");
+    assertIncludes(html, "Download Now");
+    assertIncludes(html, "data-download-key");
+    assertNotIncludes(html, 'target="_blank"');
+  }
+});
+test("isSafeDownloadUrl: http(s) only, no script/data URLs", () => {
+  assert(isSafeDownloadUrl("https://raw.githubusercontent.com/md0331400/Sayem-WebStore/main/apps/a.apk"));
+  assert(isSafeDownloadUrl(" http://example.org/a.apk "));
+  assert(!isSafeDownloadUrl("javascript:alert(1)"));
+  assert(!isSafeDownloadUrl("data:text/html,<b>x</b>"));
+  assert(!isSafeDownloadUrl(""));
+  assert(!isSafeDownloadUrl(null));
+  assert(!isSafeDownloadUrl("https://x.y/" + "a".repeat(3000)));
 });
 test("not-found view links Home / Apps / Games", () => {
   const html = renderNotFoundInner("App");

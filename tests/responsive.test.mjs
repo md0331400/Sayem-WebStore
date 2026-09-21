@@ -239,6 +239,25 @@ try {
     }
   });
 
+  // ============ PWA INSTALL POPUP COMPACTNESS ============
+  suite("PWA install popup stays a compact floating card");
+  await test("install card never becomes a full-width bottom bar (320/360/390/414)", async () => {
+    for (const [w, h] of [[320, 568], [360, 640], [390, 844], [414, 896]]) {
+      const { page, context } = await mobilePage(w, h);
+      await openRoute(page, "/");
+      const m = await page.evaluate(() => {
+        const el = document.getElementById("installBanner");
+        el.classList.remove("hidden");
+        const r = el.getBoundingClientRect();
+        return { w: Math.round(r.width), right: Math.round(r.right), bottom: Math.round(r.bottom), vw: document.documentElement.clientWidth, vh: document.documentElement.clientHeight };
+      });
+      assert(m.w <= Math.min(340, m.vw - 24) + 2, `${w}: install card compact (got ${m.w}px)`);
+      assert(m.right <= m.vw, `${w}: card inside viewport`);
+      assert(m.bottom <= m.vh, `${w}: card above viewport bottom`);
+      await context.close();
+    }
+  });
+
   // ============ SCREENSHOT GALLERY CONTAINMENT (§19) ============
   suite("Screenshot rail scrolls internally only");
   await test("rail scrollWidth may exceed viewport but body must not", async () => {

@@ -289,7 +289,8 @@
           <div class="input-group" style="margin-bottom:10px;"><label>Icon (Emoji)</label><input id="aIcon" value="📱" placeholder="📱"></div>
           <div class="input-group" style="margin-bottom:10px;"><label>Image URL</label><input id="aImageUrl" placeholder="https://example.com/image.png"></div>
         </div>
-        <div class="input-group" style="margin-bottom:10px;"><label>Download Link</label><input id="aLink" placeholder="https://play.google.com/..."></div>
+        <div class="input-group" style="margin-bottom:10px;"><label>Download Type</label><select id="aDownloadType" disabled><option value="direct" selected>Direct Download</option></select><div style="font-size:10px;color:var(--text-dim);margin-top:3px;">APK files are hosted by you on GitHub; the raw URL below is the actual download source.</div></div>
+        <div class="input-group" style="margin-bottom:10px;"><label>Download URL (GitHub Raw APK)</label><input id="aLink" placeholder="https://raw.githubusercontent.com/md0331400/Sayem-WebStore/main/apps/myapp.apk"><div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Direct file URL (GitHub Raw APK). The browser downloads straight from this URL — no server proxy.</div></div>
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📦 Version Info (optional — used for app update checking &amp; SEO)</div>
         <div class="form-cols-3">
           <div class="input-group" style="margin-bottom:10px;"><label>Version Name</label><input id="aVersionName" placeholder="2.5.1"></div>
@@ -1122,6 +1123,16 @@ async function updateStats() {
   } catch (e) {}
 }
 
+// One download-URL rule for the admin form (mirrors seo-utils isSafeDownloadUrl):
+// trimmed http/https only; javascript:/data:/control chars rejected.
+function isValidDownloadUrl(v) {
+  const u = String(v || '').trim();
+  if (!u) return true; // empty allowed = "no download yet"
+  if (u.length > 2048) return false;
+  if (/[\u0000-\u0020\u007f]/.test(u)) return false;
+  return /^https?:\/\//i.test(u);
+}
+
 // ============ APPS ============
 async function addApp() {
   const n = document.getElementById('aName').value.trim();
@@ -1139,13 +1150,14 @@ async function addApp() {
   const s4 = document.getElementById('aScreen4').value.trim();
   const s5 = document.getElementById('aScreen5').value.trim();
   if (!n || !d) { toast('Name and Description are required', 'error'); return; }
+  if (!isValidDownloadUrl(lk)) { toast('Download URL must be a valid http(s) link (GitHub Raw APK URL)', 'error'); return; }
   let vc = null;
   if (vcRaw !== '') {
     vc = Number(vcRaw);
     if (!Number.isInteger(vc) || vc < 0) { toast('Version Code must be a whole number (e.g. 25)', 'error'); return; }
   }
   if (pkg && !/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(pkg)) { toast('Package Name looks invalid (e.g. com.example.app)', 'error'); return; }
-  const appData = { name: n, icon: ic, imageUrl: img || null, category: c, description: d, link: lk || null, downloads: 0, createdAt: Date.now() };
+  const appData = { name: n, icon: ic, imageUrl: img || null, category: c, description: d, link: lk || null, downloadType: lk ? 'direct' : null, downloads: 0, createdAt: Date.now() };
   appData.versionName = vn || null;
   appData.versionCode = vc;
   appData.packageName = pkg || null;
@@ -1225,7 +1237,8 @@ function openEditApp(k) {
         <div class="input-group" style="margin-bottom:10px;"><label>Icon</label><input id="editIcon" value="${esc(a.icon || '📱')}" placeholder="📱"></div>
         <div class="input-group" style="margin-bottom:10px;"><label>Image URL</label><input id="editImageUrl" value="${esc(a.imageUrl || '')}" placeholder="https://..."></div>
       </div>
-      <div class="input-group" style="margin-bottom:10px;"><label>Link</label><input id="editLink" value="${esc(a.link || '')}" placeholder="https://..."></div>
+      <div class="input-group" style="margin-bottom:10px;"><label>Download Type</label><select id="editDownloadType" disabled><option value="direct" selected>Direct Download</option></select></div>
+      <div class="input-group" style="margin-bottom:10px;"><label>Download URL (GitHub Raw APK)</label><input id="editLink" value="${esc(a.link || '')}" placeholder="https://raw.githubusercontent.com/.../myapp.apk"><div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Direct file URL (GitHub Raw APK). The browser downloads straight from this URL — no server proxy.</div></div>
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600;">📦 Version Info</div>
       <div class="form-cols-3">
         <div class="input-group" style="margin-bottom:10px;"><label>Version Name</label><input id="editVersionName" value="${esc(a.versionName || '')}" placeholder="2.5.1"></div>
@@ -1264,13 +1277,15 @@ async function saveEditApp() {
   const s4 = document.getElementById('editScreen4')?.value.trim();
   const s5 = document.getElementById('editScreen5')?.value.trim();
   if (!n || !d) { toast('Name and Description are required', 'error'); return; }
+  if (!isValidDownloadUrl(lk)) { toast('Download URL must be a valid http(s) link (GitHub Raw APK URL)', 'error'); return; }
   let vc = null;
   if (vcRaw !== '') {
     vc = Number(vcRaw);
     if (!Number.isInteger(vc) || vc < 0) { toast('Version Code must be a whole number (e.g. 25)', 'error'); return; }
   }
   if (pkg && !/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(pkg)) { toast('Package Name looks invalid (e.g. com.example.app)', 'error'); return; }
-  const updates = { name: n, category: c, icon: ic, imageUrl: img || null, link: lk || null, description: d,
+  // _update() merges: downloads, reviews, createdAt and legacy fields stay untouched.
+  const updates = { name: n, category: c, icon: ic, imageUrl: img || null, link: lk || null, downloadType: lk ? 'direct' : null, description: d,
     versionName: vn || null, versionCode: vc, packageName: pkg || null, updatedAt: Date.now(),
     screenshot1: s1 || null, screenshot2: s2 || null, screenshot3: s3 || null, screenshot4: s4 || null, screenshot5: s5 || null };
   try {

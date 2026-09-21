@@ -334,20 +334,32 @@ try {
     const authVisibleBefore = await page.$eval("#authPage", (e) => e.classList.contains("active"));
     assert(!authVisibleBefore, "guest stays on the app page");
     await installSpies(page);
-    const popupPromise = browser
-      .waitForTarget((t) => t.url().includes("example.test/downloads"), { timeout: 4000 })
-      .catch(() => null);
+    await page.evaluate(() => {
+      sessionStorage.setItem("__tx", "0");
+      const orig = window._runTransaction;
+      window._runTransaction = (r, fn) => {
+        sessionStorage.setItem("__tx", String(Number(sessionStorage.getItem("__tx") || 0) + 1));
+        return orig(r, fn);
+      };
+    });
+    const handedOff = [];
+    page.on("request", (r) => {
+      if (r.url().includes("example.test/downloads")) handedOff.push(r.url());
+    });
+    const popups = [];
+    browser.on("targetcreated", (t) => { if (t.type() === "page") popups.push(t.url()); });
     await page.evaluate(() => document.querySelector(".detail-actions a.btn-primary").scrollIntoView({ block: "center" }));
+    const handoffWait = page.waitForRequest((r) => r.url().includes("example.test/downloads"), { timeout: 5000 });
     await page.click(".detail-actions a.btn-primary");
-    await new Promise((r) => setTimeout(r, 300));
-    const tx = await page.evaluate(() => window.__txCount);
-    assert(tx >= 1, "download counter transaction fired for guest");
+    await handoffWait;
+    assertEq(handedOff.length, 1, "one same-tab hand-off toward the stored direct URL");
+    assertEq(popups.length, 0, "no popup/new tab");
+    await page.goBack({ waitUntil: "domcontentloaded" }).catch(() => {});
+    await page.waitForSelector(".detail-actions a.btn-primary", { timeout: 8000 });
+    const tx = Number(await page.evaluate(() => sessionStorage.getItem("__tx")));
+    assertEq(tx, 1, "counter transaction fired exactly once for guest");
     const stillNotAuth = await page.$eval("#authPage", (e) => e.classList.contains("active"));
     assert(!stillNotAuth, "no login redirect after download");
-    const toastText = await page.$eval("#toast", (e) => e.textContent).catch(() => "");
-    assertIncludes(toastText, "Download started");
-    const popup = await popupPromise;
-    console.log(popup ? "  (popup opened toward the download URL)" : "  (popup target not observed — counter/toast assertions stand)");
     await context.close();
   });
 
@@ -400,30 +412,59 @@ try {
   });
 
   // ============ UPDATE CHECKER UI ============
-  suite("App update banner (?pkg=&vc=)");
-  await test("vc 10 vs site 25 → banner; equal/newer → none; pkg mismatch → none", async () => {
+  suite("Website update UI removed + direct same-tab download handoff");
+  await test("?pkg=&vc= no longer triggers any update UI on the website", async () => {
     const { page, context } = await newPage(APP_CACHE_SEED);
     await page.goto(`${DEV}${calcPath}?pkg=com.samva.calculator&vc=10`, { waitUntil: "domcontentloaded" });
-    await page.waitForSelector(".update-banner", { timeout: 10000 });
-    const bannerText = await page.$eval(".update-banner", (e) => e.textContent);
-    assertIncludes(bannerText, "10");
-    assertIncludes(bannerText, "25");
-
-    await page.goto(`${DEV}${calcPath}?pkg=com.samva.calculator&vc=25`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".app-detail-name", { timeout: 10000 });
-    assert(!(await page.$(".update-banner")), "no banner when equal");
-
-    await page.goto(`${DEV}${calcPath}?pkg=com.samva.calculator&vc=30`, { waitUntil: "domcontentloaded" });
-    await page.waitForSelector(".app-detail-name", { timeout: 10000 });
-    assert(!(await page.$(".update-banner")), "no false banner when installed is newer");
-
-    await page.goto(`${DEV}${calcPath}?pkg=com.other.app&vc=1`, { waitUntil: "domcontentloaded" });
-    await page.waitForSelector(".app-detail-name", { timeout: 10000 });
-    assert(!(await page.$(".update-banner")), "no banner for mismatched package");
+    assert(!(await page.$(".update-banner")), "no update banner on website");
+    const btnText = await page.$eval("#appDetailPageContent a[data-download-key]", (el) => el.textContent);
+    assertIncludes(btnText, "Download Now");
+    const target = await page.$eval("#appDetailPageContent a[data-download-key]", (el) => el.getAttribute("target"));
+    assert(target === null, "download anchor must not open a new tab");
     await context.close();
   });
-
-  // ============ ATTRIBUTION (spec tests A–F + referrers) ============
+  await test("Download click: exactly one counter increment, same-tab hand-off, no popup tab", async () => {
+    const { page, context } = await newPage(APP_CACHE_SEED);
+    const popups = [];
+    browser.on("targetcreated", (t) => { if (t.type() === "page") popups.push(t.url()); }); // ignore SW/worker targets
+    const requests = [];
+    page.on("request", (r) => requests.push(r.url()));
+    await page.goto(`${DEV}${calcPath}`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#appDetailPageContent a[data-download-key]", { timeout: 10000 });
+    await installSpies(page);
+    // Mirror counter transactions into sessionStorage — it survives the
+    // same-tab hand-off navigation, so exactly-once is assertable afterwards.
+    await page.evaluate(() => {
+      sessionStorage.setItem("__tx", "0");
+      const orig = window._runTransaction;
+      window._runTransaction = (r, fn) => {
+        sessionStorage.setItem("__tx", String(Number(sessionStorage.getItem("__tx") || 0) + 1));
+        return orig(r, fn);
+      };
+    });
+    const link = await page.$eval("#appDetailPageContent a[data-download-key]", (el) => el.getAttribute("href"));
+    const handoffWait = page.waitForRequest((r) => r.url() === link, { timeout: 5000 });
+    await page.click("#appDetailPageContent a[data-download-key]");
+    await handoffWait;
+    assertEq(popups.length, 0, "no new tab/window opened");
+    await page.goBack({ waitUntil: "domcontentloaded" }).catch(() => {});
+    await page.waitForSelector("#appDetailPageContent a[data-download-key]", { timeout: 8000 });
+    const tx = Number(await page.evaluate(() => sessionStorage.getItem("__tx")));
+    assertEq(tx, 1, `exactly one counter increment, got ${tx}`);
+    assert(requests.some((u) => u === link), "browser handed off to the stored direct URL");
+    await context.close();
+  });
+  await test("invalid stored URL disables the download button instead of navigating", async () => {
+    const { page, context } = await newPage(APP_CACHE_SEED);
+    await page.goto(DEV + "/", { waitUntil: "domcontentloaded" });
+    await page.evaluate(() => {
+      window.handleDownloadClick(new Event("click"), "-Test0001keyAAA", "javascript:alert(1)");
+    });
+    const url = page.url();
+    assert(url.startsWith(DEV), "no navigation to script URL");
+    await context.close();
+  });
   suite("Signup attribution (spec §65 Test A–F)");
   await test("Test A+D — Facebook UTM → internal navigation → signup keeps Facebook", async () => {
     const { page, context } = await newPage(APP_CACHE_SEED);

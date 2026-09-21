@@ -1,8 +1,8 @@
 // Service worker — Sayem WebStore PWA
 // Cache version bumped for the v4.1 SEO/router release so every client
 // picks up the new shell, seo-utils.js and attribution.js immediately.
-const STATIC_CACHE = 'sayem-static-v15';
-const RUNTIME_CACHE = 'sayem-runtime-v15';
+const STATIC_CACHE = 'sayem-static-v16';
+const RUNTIME_CACHE = 'sayem-runtime-v16';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -32,7 +32,12 @@ function isBypassRequest(url) {
     url.hostname.includes("firebaseio.com") ||
     url.hostname.includes("api.ipify.org") ||
     url.hostname.includes("effectivecpmnetwork.com") ||
-    url.hostname.includes("googleapis.com")
+    url.hostname.includes("googleapis.com") ||
+    // APK binaries live on GitHub Raw: the PWA must never intercept, cache,
+    // clone or proxy them (download hand-off stays a plain browser download).
+    url.hostname.includes("githubusercontent.com") ||
+    url.hostname.includes("github.com") ||
+    url.pathname.endsWith(".apk")
   );
 }
 

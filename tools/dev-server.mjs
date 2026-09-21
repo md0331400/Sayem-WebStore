@@ -47,6 +47,7 @@ const MIME = {
 const sitemapHandler = require(path.join(ROOT, "api/sitemap.js"));
 const appPageHandler = require(path.join(ROOT, "api/app-page.js"));
 const visitHandler = require(path.join(ROOT, "api/visit.js"));
+const appUpdateHandler = require(path.join(ROOT, "api/app-update.js"));
 
 // Vercel's Node runtime hands functions an Express-style response object.
 // Shim the two methods used by api/*.js so the same code runs locally.
@@ -91,6 +92,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (pathname === "/sitemap.xml") return await sitemapHandler(req, vercelizeRes(res));
     if (pathname === "/api/visit") return await visitHandler(req, vercelizeRes(res));
+    if (pathname === "/api/app-update") return await appUpdateHandler(req, vercelizeRes(res));
 
     const detail = pathname.match(DETAIL_RE);
     if (detail) {

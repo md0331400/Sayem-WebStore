@@ -12,7 +12,7 @@ import {
   getAppPath,
   getAverageRating,
   getReviewList,
-  resolveUpdateStatus,
+  isSafeDownloadUrl,
   buildAppViewModel,
   renderAppDetailInner,
   renderNotFoundInner,
@@ -71,7 +71,8 @@ let slugIndex = { byKey: new Map(), bySlug: new Map() };
 let pendingDetailRoute = null;
 let pendingDetailTimer = null;
 let detailVm = null;
-let detailInstallContext = { pkg: null, vc: null }; // Android host params (?pkg=&vc=)
+// Website update UI = NONE. Installed-version context (?pkg=&vc=) was removed:
+// update checking lives in the future Android app via GET /api/app-update.
 let lastMetaApply = null;
 let lastNonDetailPath = "/";
 
@@ -470,17 +471,12 @@ function resolveDetailRoute(slug, typeHint, params) {
   const canonicalPath = getAppPath(app, slugIndex);
   if (canonicalPath !== `/${typeHint}/${slug}`) {
     // Wrong type prefix (e.g. /app/<game-slug>) → permanent-style redirect to canonical path
-    const keep = [];
-    if (params.get("pkg")) keep.push(`pkg=${encodeURIComponent(params.get("pkg"))}`);
-    if (params.get("vc")) keep.push(`vc=${encodeURIComponent(params.get("vc"))}`);
-    navigate(keep.length ? `${canonicalPath}?${keep.join("&")}` : canonicalPath, { replace: true });
+    navigate(canonicalPath, { replace: true });
     return;
   }
 
   openAppDetail(app.key, {
     fromRoute: true,
-    installedPkg: params.get("pkg"),
-    installedVc: params.get("vc")
   });
 }
 
@@ -1515,7 +1511,7 @@ function renderHeroBanner(source = allApps) {
 
   const slideHtml = (app, i) => {
     const path = getAppPath(app, slugIndex);
-    const hasLink = typeof app.link === "string" && /^https?:\/\//i.test(app.link);
+    const hasLink = isSafeDownloadUrl(app.link);
     return `
     <div class="banner-slide ${i === 0 ? "active" : ""}">
       <div class="banner-copy">
@@ -1536,7 +1532,7 @@ function renderHeroBanner(source = allApps) {
             : `<span>${escapeHtml(app.icon || "📱")}</span>`}
         </div>
         ${hasLink
-          ? `<a class="btn btn-primary" href="${escapeHtml(app.link)}" target="_blank" rel="noopener" onclick='return handleDownloadClick(event, ${toJsString(app.key)}, ${toJsString(app.link)})'>Download</a>`
+          ? `<a class="btn btn-primary" href="${escapeHtml(app.link)}" download data-download-key="${escapeHtml(String(app.key))}" data-download-url="${escapeHtml(app.link)}">Download</a>`
           : `<button class="btn btn-primary" disabled>Download</button>`}
       </div>
     </div>`;
@@ -1829,25 +1825,13 @@ function openAppDetail(key, opts = {}) {
   }
   selectedRatingValue = userReview ? Number(userReview.rating) || 0 : 0;
 
-  // Android host integration: /app/slug?pkg=com.example.app&vc=10
-  if (!opts.fromRoute || opts.installedVc !== undefined) {
-    detailInstallContext = { pkg: opts.installedPkg || null, vc: opts.installedVc || null };
-  }
-  let installedVersionCode = null;
-  if (detailInstallContext.vc !== null && detailInstallContext.vc !== undefined) {
-    const vc = Number(detailInstallContext.vc);
-    const pkgMatches = !app.packageName || !detailInstallContext.pkg || app.packageName === detailInstallContext.pkg;
-    if (Number.isFinite(vc) && pkgMatches) installedVersionCode = vc;
-  }
-
   const vm = buildAppViewModel(app, {
     allApps,
     slugIndex,
     siteName: getSiteName(),
     origin: SITE_ORIGIN,
     isLoggedIn: !!currentUser,
-    userReview,
-    installedVersionCode
+    userReview
   });
   detailVm = vm;
 
@@ -1957,34 +1941,65 @@ async function incrementDownloadCounter(key) {
 }
 
 /**
- * Anchor click handler for download links: validates the URL, keeps the
- * existing counter, and lets the browser open the file. Guests included —
- * downloading never requires login.
+ * Single download hand-off core used by every Download control on the site
+ * (home banner, app/game cards, detail page). Behaviour:
+ *   • validates the stored direct URL (GitHub Raw APK) — never javascript:/data:
+ *   • increments the app counter exactly once per genuine click
+ *   • hands the browser the URL in the SAME tab (no target=_blank, no proxy):
+ *     Chrome/Android starts the APK download from the raw URL directly
+ *   • guests included — downloads never require login
  */
-function handleDownloadClick(event, key, link) {
-  if (event && (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) {
-    return true; // modifier/middle clicks: just open, still count below
-  }
-  if (!link || !/^https?:\/\//i.test(String(link))) {
+async function performDownloadHandoff(key, link, event) {
+  const url = String(link || "").trim();
+  if (!isSafeDownloadUrl(url)) {
     if (event) event.preventDefault();
     toast("This download link is not available yet.", "error");
     return false;
   }
-  incrementDownloadCounter(key);
+  const modifier = event && (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey);
+  if (modifier) return true; // browser-managed tab: not our download action
+
+  // Count first, then navigate: awaiting the transaction keeps the increment
+  // from being cancelled by the same-tab navigation. Bounded wait so a slow
+  // network can never block the hand-off.
+  if (event) event.preventDefault();
   toast("Download started! 🚀", "success");
-  return true; // allow the anchor's default navigation
+  await Promise.race([
+    incrementDownloadCounter(key),
+    new Promise((resolve) => setTimeout(resolve, 1200))
+  ]);
+  window.location.assign(url);
+  return true;
+}
+
+/** Delegated click handler for every [data-download-key] anchor. */
+function setupDownloadDelegation() {
+  document.addEventListener("click", (event) => {
+    const anchor = event.target && event.target.closest ? event.target.closest("a[data-download-key]") : null;
+    if (!anchor) return;
+    performDownloadHandoff(anchor.getAttribute("data-download-key"), anchor.getAttribute("data-download-url"), event);
+  });
+}
+
+/** Compatibility wrapper for older inline handlers/calls. */
+function handleDownloadClick(event, key, link) {
+  return performDownloadHandoff(key, link, event);
 }
 window.handleDownloadClick = handleDownloadClick;
 
 /** Legacy programmatic download (kept for compatibility) — guests allowed. */
-function downloadApp(key, link) {
-  if (!link || !/^https?:\/\//i.test(String(link))) {
+async function downloadApp(key, link) {
+  const url = String(link || "").trim();
+  if (!isSafeDownloadUrl(url)) {
     toast("This download link is not available yet.", "error");
     return;
   }
-  incrementDownloadCounter(key);
   toast("Download started! 🚀", "success");
-  window.open(link, "_blank", "noopener");
+  await Promise.race([
+    incrementDownloadCounter(key),
+    new Promise((resolve) => setTimeout(resolve, 1200))
+  ]);
+  window.location.assign(url); // same-tab hand-off, never a new window
 }
 window.downloadApp = downloadApp;
 
@@ -2093,52 +2108,26 @@ function toggleTheme() {
 }
 window.toggleTheme = toggleTheme;
 
-// ============ APP UPDATE CHECKER (Android host bridge) ============
-// An Android wrapper/WebView can either:
-//   • open /app/{slug}?pkg=com.example.app&vc=10  → on-page update banner, or
-//   • call window.SayemWebStore.checkAppUpdate(packageName, installedVersionCode)
-// Rules: website versionCode > installed → update; equal → nothing;
-// lower → no false update; missing data → never crash, no prompt.
-let appsLoadedPromise = null;
-function ensureAppsLoaded() {
-  if (allApps.length) return Promise.resolve(allApps);
-  if (!appsLoadedPromise) {
-    appsLoadedPromise = new Promise((resolve) => {
-      if (!firebaseReady) {
-        resolve(allApps);
-        return;
-      }
-      window._get(window._ref(window._db, "apps")).then((snap) => {
-        if (!allApps.length && snap.exists()) {
-          snap.forEach((child) => allApps.push({ key: child.key, ...child.val() }));
-          onAppsUpdated();
-          scheduleAppsRender();
-        }
-        resolve(allApps);
-      }).catch(() => resolve(allApps));
-    });
-  }
-  return appsLoadedPromise;
-}
+// ============ UPDATE CHECKING (future Android app only) ============
+// WEBSITE UPDATE UI = NONE. The catalog never renders update banners/modals.
+// ANDROID APP UPDATE CHECK = GET /api/app-update?packageName=…&versionCode=…
+// which reads Firebase `apps` and applies the single comparison rule
+// (latestVersionCode > installedVersionCode). The helper below is a thin
+// client of that API, kept for tests/compatibility.
 
 window.SayemWebStore = {
-  version: "4.1.0",
+  version: "4.2.0",
+  /**
+   * Compatibility/test helper ONLY — the website itself never shows an update
+   * banner or modal. It simply asks the public JSON API, which owns the single
+   * comparison rule (latestVersionCode > installedVersionCode).
+   */
   async checkAppUpdate(packageName, installedVersionCode) {
     try {
-      await ensureAppsLoaded();
-      const app = allApps.find((a) => a && a.packageName === packageName) || null;
-      if (!app) return { found: false, updateAvailable: false, reason: "not-listed" };
-      const status = resolveUpdateStatus(installedVersionCode, app.versionCode);
-      return {
-        found: true,
-        name: app.name || "",
-        url: `${SITE_ORIGIN}${getAppPath(app, slugIndex)}`,
-        latestVersionCode: app.versionCode ?? null,
-        latestVersionName: app.versionName || null,
-        downloadUrl: app.link || null,
-        updateAvailable: status.updateAvailable,
-        reason: status.reason
-      };
+      const qs = new URLSearchParams({ packageName: String(packageName || ""), versionCode: String(installedVersionCode ?? "") });
+      const res = await fetch(`/api/app-update?${qs.toString()}`, { headers: { Accept: "application/json" } });
+      if (!res.ok) return { found: false, updateAvailable: false, reason: "error" };
+      return await res.json();
     } catch {
       return { found: false, updateAvailable: false, reason: "error" };
     }
@@ -2224,6 +2213,7 @@ function initShell() {
   updateInstallUI();
   registerServiceWorker();
   setupGlobalEvents();
+  setupDownloadDelegation();
 
   // Initial route from the real URL (/app/slug, /games, /search?q=… etc.)
   applyRouteFromLocation();

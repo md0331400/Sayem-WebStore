@@ -153,7 +153,25 @@ export function getReviewList(app) {
     .sort((a, b) => (Number(b.date) || 0) - (Number(a.date) || 0));
 }
 
+// ---------- download URL safety ----------
+
+/**
+ * One validation rule for every download hand-off (client renderer, click
+ * handler and admin form all follow the same shape):
+ * trimmed http/https URLs only — never javascript:/data:/vbscript:, never
+ * control characters. GitHub Raw APK URLs are the expected production value.
+ */
+export function isSafeDownloadUrl(url) {
+  const u = String(url === undefined || url === null ? "" : url).trim();
+  if (!u || u.length > 2048) return false;
+  if (/[\u0000-\u0020\u007f]/.test(u)) return false;
+  return /^https?:\/\//i.test(u);
+}
+
 // ---------- update checking (versionCode compare) ----------
+// NOTE: this pure rule is the SINGLE comparison implementation. The public
+// JSON API (api/app-update.js) imports it; the WEBSITE UI never renders an
+// update banner/modal from it (website update UI = NONE by design).
 
 /**
  * Pure comparison used by the update checker.
@@ -223,17 +241,9 @@ export function buildAppViewModel(app, opts = {}) {
   const updatedLabel = formatDateLabel(updatedTs);
   if (updatedLabel) infoRows.push({ label: "Last Updated", value: updatedLabel });
 
-  let updateInfo = null;
-  if (installedVersionCode !== null && app.versionCode !== undefined && app.versionCode !== null && app.versionCode !== "") {
-    const status = resolveUpdateStatus(installedVersionCode, app.versionCode);
-    if (status.updateAvailable) {
-      updateInfo = {
-        installedVersionCode: Number(installedVersionCode),
-        latestVersionCode: Number(app.versionCode),
-        latestVersionName: app.versionName ? String(app.versionName) : "",
-      };
-    }
-  }
+  // Website update UI = NONE. Installed-version comparison belongs to the
+  // future Android app (via /api/app-update); the catalog page never shows
+  // update banners, so no updateInfo is computed here.
 
   const description = String(app.description || "").trim();
   const metaDescription = description
@@ -261,7 +271,6 @@ export function buildAppViewModel(app, opts = {}) {
     infoRows,
     updatedTs,
     updatedLabel,
-    updateInfo,
     related: pickRelated(app, allApps, slugIndex),
     screenshots: [app.screenshot1, app.screenshot2, app.screenshot3, app.screenshot4, app.screenshot5].filter(
       (u) => typeof u === "string" && u.startsWith("http")
@@ -336,7 +345,7 @@ function starsHtml(rating) {
 export function renderAppDetailInner(vm) {
   const app = vm.app;
   const name = escapeHtml(app.name || "App");
-  const hasLink = typeof app.link === "string" && /^https?:\/\//i.test(app.link);
+  const hasLink = isSafeDownloadUrl(app.link);
 
   const breadcrumbHtml = `
     <nav class="breadcrumbs" aria-label="Breadcrumb">
@@ -352,15 +361,6 @@ export function renderAppDetailInner(vm) {
       </ol>
     </nav>`;
 
-  const updateBannerHtml = vm.updateInfo
-    ? `
-    <div class="update-banner" role="status">
-      <strong>⬆️ Update available for ${name}</strong>
-      <span>Installed version code ${vm.updateInfo.installedVersionCode} → latest ${vm.updateInfo.latestVersionCode}${
-        vm.updateInfo.latestVersionName ? ` (${escapeHtml(vm.updateInfo.latestVersionName)})` : ""
-      }. Download the newest version below.</span>
-    </div>`
-    : "";
 
   const ratingStat = vm.avgRating === null ? "New" : `★ ${vm.avgRating}`;
 
@@ -442,10 +442,11 @@ export function renderAppDetailInner(vm) {
     </div>`
     : "";
 
+  // Direct hand-off anchor: same-tab navigation to the stored direct URL
+  // (GitHub Raw APK). No target="_blank", no proxy, no inline JS — the click
+  // is handled by one delegated listener keyed on data-download-key.
   const downloadHtml = hasLink
-    ? `<a class="btn btn-primary" href="${escapeHtml(app.link)}" target="_blank" rel="noopener" onclick='return handleDownloadClick(event, ${JSON.stringify(String(app.key))}, ${JSON.stringify(String(app.link))})'>${
-        vm.updateInfo ? "⬆️ Update Now" : "⬇️ Download Now"
-      }</a>`
+    ? `<a class="btn btn-primary" href="${escapeHtml(app.link)}" download data-download-key="${escapeHtml(String(app.key))}" data-download-url="${escapeHtml(app.link)}">⬇️ Download Now</a>`
     : `<button class="btn btn-primary" disabled title="Download link not available yet">⬇️ Download unavailable</button>`;
 
   return `
@@ -465,7 +466,6 @@ export function renderAppDetailInner(vm) {
         </div>
       </div>
 
-      ${updateBannerHtml}
 
       ${infoHtml}
 

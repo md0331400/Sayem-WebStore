@@ -1860,8 +1860,8 @@ a {
 
 .install-banner {
   position: fixed;
-  right: 10px;
-  bottom: 10px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   z-index: 65;
   width: min(calc(100% - 20px), 380px);
   display: flex;
@@ -2513,11 +2513,13 @@ a {
     padding: 5px 10px;
   }
 
+  /* Compact floating card on phones too — bottom-right, never a full-width
+     bottom bar, never covering the Download button. */
   .install-banner {
-    left: 8px;
-    right: 8px;
-    width: auto;
-    bottom: 46px;
+    left: auto;
+    right: 12px;
+    width: min(340px, calc(100% - 24px));
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     flex-direction: column;
     padding: 10px;
     gap: 8px;
@@ -2834,18 +2836,7 @@ a.section-link:hover { text-decoration: underline; }
 }
 
 /* Update available banner (Android host / ?pkg=&vc=) */
-.update-banner {
-  grid-template-columns: minmax(0, 1fr);
-  display: grid;
-  gap: 4px;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(30, 158, 90, 0.4);
-  background: rgba(30, 158, 90, 0.08);
-  font-size: 0.84rem;
-  color: var(--text);
-}
-.update-banner span { color: var(--text-dim); }
+
 
 /* Login gate: reviews/ratings/reports need login — downloads never do */
 .login-gate-card {
@@ -2996,7 +2987,6 @@ textarea:focus-visible,
 .chip,
 .app-name,
 .brand-title,
-.update-banner,
 .not-found-block p {
   overflow-wrap: anywhere;
 }
