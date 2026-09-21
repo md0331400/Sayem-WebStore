@@ -322,7 +322,7 @@ export function appCardHtml(app, path) {
         <span>${formatCountLabel(app.downloads)} downloads</span>
       </div>
       <p class="app-desc-snippet">${escapeHtml(desc.slice(0, 110))}${desc.length > 110 ? "…" : ""}</p>
-      <span class="app-download-btn">View &amp; Download</span>
+      
     </a>`;
 }
 
