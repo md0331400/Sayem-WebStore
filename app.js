@@ -1959,19 +1959,12 @@ async function performDownloadHandoff(key, link, event) {
   const modifier = event && (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey);
   if (modifier) return true; // browser-managed tab: not our download action
 
-  // Stop native anchor navigation before the async counter work. Otherwise
-  // the browser can start the file download before this hand-off completes.
-  if (event) event.preventDefault();
-
-  // Count first, then navigate: awaiting the transaction keeps the increment
-  // from being cancelled by the same-tab navigation. Bounded wait so a slow
-  // network can never block the hand-off.
+  // Keep the download flow instant: stop the native anchor navigation,
+  // then redirect the current tab straight to the GitHub Raw URL.
+  // Counter tracking is best-effort and must never block the APK hand-off.
   if (event) event.preventDefault();
   toast("Download started! 🚀", "success");
-  await Promise.race([
-    incrementDownloadCounter(key),
-    new Promise((resolve) => setTimeout(resolve, 1200))
-  ]);
+  void incrementDownloadCounter(key).catch(() => {});
   window.location.assign(url);
   return true;
 }
@@ -1999,11 +1992,8 @@ async function downloadApp(key, link) {
     return;
   }
   toast("Download started! 🚀", "success");
-  await Promise.race([
-    incrementDownloadCounter(key),
-    new Promise((resolve) => setTimeout(resolve, 1200))
-  ]);
-  window.location.assign(url); // same-tab hand-off, never a new window
+  void incrementDownloadCounter(key).catch(() => {});
+  window.location.assign(url);
 }
 window.downloadApp = downloadApp;
 
