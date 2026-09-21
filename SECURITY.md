@@ -37,6 +37,7 @@ documents the migration path instead:
    then remove it.
 4. Once no client needs to scan `/users`, apply the proposed rules (see §4) and delete
    the plaintext `password` field from migrated records.
+5. Migrated user sessions use `userUids/{uid}` as a fast profile-key mapping; legacy scan fallback remains only for unmigrated accounts.
 
 Until then: advise users not to reuse passwords, and treat the password column as
 public data (because, under current rules, it effectively is).
@@ -44,9 +45,9 @@ public data (because, under current rules, it effectively is).
 ## 2. Open database rules (pre-existing)
 
 The Realtime Database currently relies on permissive rules so that the client-side app
-can read `/apps`, `/settings`, `/ads` and scan `/users` for login. In practice this also
-exposes `/reports`, `/visitors`, `/admins` and the plaintext passwords to anonymous
-readers.
+can read `/apps`, `/settings`, `/ads` and legacy account records. In practice this also
+exposes `/reports`, `/visitors`, `/admins` and legacy plaintext passwords to anonymous
+readers until the migration is completed.
 
 `database.rules.proposed.json` in this repository contains a ruleset that closes reads
 and writes to the minimum the app needs **after** the Firebase Auth migration in §1 is
@@ -65,11 +66,13 @@ repository; none were added.
 See `database.rules.proposed.json`. Highlights:
 
 - `/apps`, `/settings`, `/ads`, `/adStats`: public read; writes require an admin uid.
-- `/users/{uid}`: readable/writable only by the owning authenticated user; admins get
-  read access for support tooling (with an audit trail recommended).
-- `/reports`: create-only for authenticated users; read for admins.
-- `/visitors`: write-only for clients (aggregated counters), no public read of raw rows.
-- `/admins`: no client reads at all; admin checks move server-side or to custom claims.
+- `/users/{uid}`: authenticated owner access; trusted admins can read/update through the admin mapping, and users cannot change their own `blocked`/`status` fields or recreate a `password` field.
+- `/userUids/{uid}`: owner-only mapping from Firebase Auth uid to the profile record key.
+- `/reports`: authenticated create/update by the owning uid; read for admins; size/type validation included.
+- `/visitors`: no client writes in the proposed rules because the current public analytics path no longer needs visitor-record writes.
+- `/admins/{key}`: access limited to the mapped trusted admin uid; plaintext password fields are rejected.
+- `/adminUids/{uid}`: trusted setup data; client writes remain disabled.
+- `/analytics`: admin read access; anonymous aggregate writes remain permitted because `/api/visit` is a public, privacy-light beacon.
 
 Applying these rules is a **breaking change for the legacy auth flow** — pair the
 deployment with the migration steps in §1.
@@ -120,9 +123,9 @@ Email abusayem0866@gmail.com (also linked in the site footer) for security repor
 
 ## 10. Download counter abuse resistance (honest limitations)
 
-- Counters increment through a Firebase `runTransaction` on the app record, so concurrent clicks never lose an increment (atomic read-modify-write).
-- Increments are client-initiated because the Realtime Database rules are open (see §2). A determined attacker can therefore still inflate a counter by writing to the database directly. Server-side enforcement becomes possible only after the proposed rules in §4 are reviewed and deployed by the owner; this release deliberately did **not** deploy them.
-- Mitigations in place: transactional atomicity, no client-side trust for displayed values (always read from the database), guest-download increments limited to one per click event, and admin visibility of abnormal counts.
+- Counters increment through a Firebase `runTransaction` on the app record, so concurrent clicks do not lose increments (atomic read-modify-write).
+- The proposed rules additionally validate that a client write can only increase the nested `downloads` value by exactly one.
+- The counter remains client-initiated until the rules are reviewed and deployed; direct database abuse cannot be fully eliminated by frontend code alone.
 
 ## 11. Visitor tracking discontinuation & anonymous analytics
 
@@ -134,3 +137,15 @@ Email abusayem0866@gmail.com (also linked in the site footer) for security repor
 
 - Priority: UTM parameters > external referrer > Direct. First-touch attribution is immutable once stored; latest-touch updates only from external referrers; pre-signup state lives in `localStorage` (`sayemweb_attribution_v1`) with a 90-day TTL and is validated on read (corrupted values fall back safely).
 - At signup the attribution snapshot is stored on the user record together with, but separate from, the user's own "how did you hear about us" answer.
+
+## 12. Production hardening added on 2026-09-21
+
+- LocalStorage is no longer treated as the source of truth for the logged-in user state; Firebase Auth must confirm the session.
+- Protected review/report writes verify that the local profile uid matches the active Firebase Auth uid.
+- Reviews are limited to ratings 1–5 and 2000 comment characters; reports are bounded to the proposed-rule limits.
+- Blocked user accounts are rejected on login/session hydration and can be controlled from the admin panel.
+- User/admin password reset uses Firebase Authentication.
+- Admin password changes reauthenticate with the current password before calling updatePassword.
+- The PWA service worker now uses network-first fetching for HTML, JavaScript, CSS and the manifest, while keeping an offline fallback.
+- Deployment headers and cache freshness are tightened in vercel.json.
+- See PRODUCTION-CHECKLIST.md for the remaining Firebase Console migration steps.
