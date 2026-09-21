@@ -1465,6 +1465,54 @@ function startBannerTimer() {
   }
 }
 
+function setupBannerSwipe(banner) {
+  if (!banner || banner.dataset.swipeBound === "1") return;
+  banner.dataset.swipeBound = "1";
+
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+  let suppressClickUntil = 0;
+
+  banner.addEventListener("touchstart", (event) => {
+    if (!event.touches || event.touches.length !== 1) return;
+    startX = event.touches[0].clientX;
+    startY = event.touches[0].clientY;
+    tracking = true;
+    clearBannerTimer();
+  }, { passive: true });
+
+  banner.addEventListener("touchend", (event) => {
+    if (!tracking || !event.changedTouches || !event.changedTouches.length) return;
+    const endX = event.changedTouches[0].clientX;
+    const endY = event.changedTouches[0].clientY;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    tracking = false;
+
+    if (Math.abs(dx) < 45 || Math.abs(dx) <= Math.abs(dy)) {
+      startBannerTimer();
+      return;
+    }
+
+    suppressClickUntil = Date.now() + 350;
+    moveBanner(dx < 0 ? 1 : -1);
+  }, { passive: true });
+
+  banner.addEventListener("touchcancel", () => {
+    tracking = false;
+    startBannerTimer();
+  }, { passive: true });
+
+  banner.addEventListener("click", (event) => {
+    if (Date.now() < suppressClickUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+      suppressClickUntil = 0;
+    }
+  }, true);
+}
+
 function moveBanner(dir) {
   const slides = document.querySelectorAll("#featureBanner .banner-slide");
   const dots = document.querySelectorAll("#featureBanner .banner-dot");
@@ -1478,18 +1526,7 @@ function moveBanner(dir) {
 }
 window.moveBanner = moveBanner;
 
-function goBanner(index) {
-  const slides = document.querySelectorAll("#featureBanner .banner-slide");
-  const dots = document.querySelectorAll("#featureBanner .banner-dot");
-  if (!slides.length || index === bannerIndex) return;
-  slides[bannerIndex]?.classList.remove("active");
-  dots[bannerIndex]?.classList.remove("active");
-  bannerIndex = index;
-  slides[bannerIndex]?.classList.add("active");
-  dots[bannerIndex]?.classList.add("active");
-  startBannerTimer();
-}
-window.goBanner = goBanner;
+
 
 function renderHeroBanner(source = allApps) {
   const banner = $("featureBanner");
@@ -1540,17 +1577,12 @@ function renderHeroBanner(source = allApps) {
 
   banner.classList.remove("hidden");
   banner.innerHTML = `
-    <div class="banner-slides">
+    <div class="banner-slides" aria-live="polite">
       ${apps.map((app, i) => slideHtml(app, i)).join("")}
     </div>
-    ${apps.length > 1 ? `
-      <button class="banner-nav prev" aria-label="Previous app" onclick="moveBanner(-1)">‹</button>
-      <button class="banner-nav next" aria-label="Next app" onclick="moveBanner(1)">›</button>
-      <div class="banner-dots">
-        ${apps.map((app, i) => `<button class="banner-dot ${i === 0 ? "active" : ""}" aria-label="Go to slide ${i + 1}" onclick="goBanner(${i})"></button>`).join("")}
-      </div>` : ""}
   `;
 
+  setupBannerSwipe(banner);
   if (apps.length > 1) startBannerTimer();
 }
 
