@@ -2127,7 +2127,7 @@ function applyTheme(theme, persist = true) {
   }
   const toggleBtn = $("themeToggle");
   if (toggleBtn) {
-    toggleBtn.textContent = finalTheme === "dark" ? "☀️" : "🌙";
+    toggleBtn.innerHTML = `<img src="/icons/${finalTheme === "dark" ? "sun.gif" : "night.gif"}" alt="" width="20" height="20" class="ui-gif-icon">`;
     toggleBtn.setAttribute("aria-label", finalTheme === "dark" ? "Switch to light mode" : "Switch to dark mode");
   }
   const metaTheme = document.querySelector('meta[name="theme-color"]');
