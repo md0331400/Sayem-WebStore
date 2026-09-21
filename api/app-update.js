@@ -82,7 +82,7 @@ module.exports = async function handler(req, res) {
   }
 
   const list = apps && typeof apps === "object" ? Object.entries(apps) : [];
-  const entry = list.find(([, a]) => a && typeof a === "object" && String(a.packageName || "") === packageName);
+  const entry = list.find(([, a]) => a && typeof a === "object" && a.published !== false && String(a.packageName || "") === packageName);
   if (!entry) {
     json(res, 200, { found: false, updateAvailable: false, reason: "not-listed", packageName });
     return;
