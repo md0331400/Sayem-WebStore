@@ -168,6 +168,17 @@ export function isSafeDownloadUrl(url) {
   return /^https?:\/\//i.test(u);
 }
 
+export function isSafeAssetUrl(url) {
+  const u = String(url === undefined || url === null ? "" : url).trim();
+  if (!u || u.length > 2048) return false;
+  if (/[\u0000-\u0020\u007f]/.test(u)) return false;
+  try {
+    const parsed = new URL(u);
+    return (parsed.protocol === "http:" || parsed.protocol === "https:") && !!parsed.hostname;
+  } catch {
+    return false;
+  }
+}
 // ---------- update checking (versionCode compare) ----------
 // NOTE: this pure rule is the SINGLE comparison implementation. The public
 // JSON API (api/app-update.js) imports it; the WEBSITE UI never renders an
@@ -231,11 +242,14 @@ export function buildAppViewModel(app, opts = {}) {
   const reviewList = getReviewList(app);
 
   const infoRows = [];
+  if (app.developerName) infoRows.push({ label: "Developer", value: String(app.developerName) });
   if (app.versionName) infoRows.push({ label: "Version", value: String(app.versionName) });
   if (app.versionCode !== undefined && app.versionCode !== null && app.versionCode !== "") {
     infoRows.push({ label: "Version Code", value: String(app.versionCode) });
   }
   if (app.packageName) infoRows.push({ label: "Package Name", value: String(app.packageName) });
+  if (app.fileSize) infoRows.push({ label: "File Size", value: String(app.fileSize) });
+  if (app.minAndroid) infoRows.push({ label: "Minimum Android", value: String(app.minAndroid) });
   infoRows.push({ label: "Category", value: category });
   const updatedTs = Number(app.updatedAt) || Number(app.createdAt) || 0;
   const updatedLabel = formatDateLabel(updatedTs);
@@ -273,7 +287,7 @@ export function buildAppViewModel(app, opts = {}) {
     updatedLabel,
     related: pickRelated(app, allApps, slugIndex),
     screenshots: [app.screenshot1, app.screenshot2, app.screenshot3, app.screenshot4, app.screenshot5].filter(
-      (u) => typeof u === "string" && u.startsWith("http")
+      (u) => isSafeAssetUrl(u)
     ),
     title: `${app.name || typeLabel} — Free ${typeLabel} Download | ${siteName}`,
     metaDescription,
@@ -293,7 +307,7 @@ export function buildAppViewModel(app, opts = {}) {
 
 function iconHtml(app, shellClass, extraAttrs = "") {
   const name = escapeHtml(app.name || "App");
-  if (app.imageUrl && String(app.imageUrl).startsWith("http")) {
+  if (isSafeAssetUrl(app.imageUrl)) {
     return `
       <div class="${shellClass}">
         <img src="${escapeHtml(app.imageUrl)}" alt="${name} icon" width="64" height="64" ${extraAttrs} onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';">
@@ -470,6 +484,7 @@ export function renderAppDetailInner(vm) {
       ${infoHtml}
 
       <div class="app-desc">${escapeHtml(app.description || "No description available.")}</div>
+      ${app.changelog ? `<section class="changelog-block"><h2 class="section-block-title">What’s New</h2><div class="app-desc">${escapeHtml(app.changelog)}</div></section>` : ""}
 
       <div class="detail-actions">
         ${downloadHtml}
