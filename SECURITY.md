@@ -1,6 +1,6 @@
 # Security Notes — Sayem WebStore
 
-Last updated: 2026-09-20 (release: SEO + attribution production upgrade)
+Last updated: 2026-09-21 (production hardening release)
 
 This document describes known security weaknesses in the current system, what this
 release changed (and deliberately did **not** change), and the recommended path to
@@ -10,10 +10,11 @@ fix each issue without breaking existing users or data.
 
 ## 1. Plaintext passwords in Firebase Realtime Database (pre-existing, NOT fixed destructively)
 
-**Status: known weakness — documented, migration recommended, no destructive change made.**
+**Status: migration support is now in the website; final Firebase Console/rules rollout is still required.**
 
-- Storefront accounts (`/users/{key}`) store `password` in plaintext.
-- Admin accounts (`/admins/{key}`) also store plaintext credentials.
+- New storefront accounts use Firebase Authentication and no longer store a plaintext `password` field.
+- Legacy storefront accounts still have a transitional password field until a successful login migrates them.
+- Admin accounts support the same Firebase Auth migration path when an email is available.
 - Login works by reading the user list client-side and comparing the stored password,
   which requires the `/users` node to be readable by the web client.
 
@@ -27,7 +28,7 @@ plaintext passwords without the user re-entering them). The task constraints exp
 forbade destructive user migration, so this release keeps behaviour identical and
 documents the migration path instead:
 
-1. Enable **Firebase Authentication (Email/Password + optional Google)** in the console.
+1. Enable **Firebase Authentication → Email/Password** in the Firebase console.
 2. Add a one-time "re-secure your account" flow: existing users log in the old way once,
    then are asked to create a Firebase Auth credential; store the Firebase `uid` on the
    existing `/users/{key}` record (`uid` field) and keep the old fields for history.
@@ -106,19 +107,30 @@ deployment with the migration steps in §1.
 
 Email abusayem0866@gmail.com (also linked in the site footer) for security reports.
 
-## 9. Download counter abuse resistance (honest limitations)
+## 9. Production hardening added in this release
+
+- Browser sessions no longer persist user password fields.
+- New accounts use Firebase Authentication instead of storing plaintext passwords.
+- Public catalog supports explicit `published` and `featured` flags; unpublished apps are excluded from public routes/search/hero.
+- Admin backup export excludes user password fields.
+- App image/screenshot inputs are constrained to HTTP(S) URLs in the admin UI and rendered with the same safety rule on the public side.
+- Download counters now update only the nested `apps/{key}/downloads` value, preparing the database for a ruleset that keeps the rest of each app record admin-only.
+- Vercel responses now include HSTS, same-origin frame protection and a restrictive Permissions-Policy.
+- Service-worker cache version was bumped to include the Firebase Auth runtime.
+
+## 10. Download counter abuse resistance (honest limitations)
 
 - Counters increment through a Firebase `runTransaction` on the app record, so concurrent clicks never lose an increment (atomic read-modify-write).
 - Increments are client-initiated because the Realtime Database rules are open (see §2). A determined attacker can therefore still inflate a counter by writing to the database directly. Server-side enforcement becomes possible only after the proposed rules in §4 are reviewed and deployed by the owner; this release deliberately did **not** deploy them.
 - Mitigations in place: transactional atomicity, no client-side trust for displayed values (always read from the database), guest-download increments limited to one per click event, and admin visibility of abnormal counts.
 
-## 10. Visitor tracking discontinuation & anonymous analytics
+## 11. Visitor tracking discontinuation & anonymous analytics
 
 - A pre-existing per-device visitor tracker stored IP address, user-agent, screen, RAM/CPU, battery state and (when logged in) the account's name/email/phone per visit. That collection was **removed** from the client in this release; no code path writes to `visitors/` anymore.
 - Legacy `visitors/` records remain in the database until the owner purges them (admin → Visitors → Clear All). The admin UI now masks identifying fields (only device name, platform, browser, language, visit counts and timestamps are rendered).
 - Replacement analytics (`POST /api/visit`) is aggregate-only: at most one event per browser session (sessionStorage-gated), carrying normalized source/sourceType/campaign/landing-path. The server stores only daily counters (`analytics/daily/{date}/…`). No IP, no cookies, no fingerprint, no per-pageview writes. Signup conversion adds exactly one increment per signup.
 
-## 11. Attribution storage summary
+## 12. Attribution storage summary
 
 - Priority: UTM parameters > external referrer > Direct. First-touch attribution is immutable once stored; latest-touch updates only from external referrers; pre-signup state lives in `localStorage` (`sayemweb_attribution_v1`) with a 90-day TTL and is validated on read (corrupted values fall back safely).
 - At signup the attribution snapshot is stored on the user record together with, but separate from, the user's own "how did you hear about us" answer.
