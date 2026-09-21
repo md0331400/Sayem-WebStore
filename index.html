@@ -7,6 +7,7 @@
 <meta name="description" content="Sayem WebStore is a free platform to discover, review and download apps and games for Android. Browse the catalog, read real user reviews and download in one tap — no login needed.">
 <meta name="author" content="Md. Abu Sayem (amisayem)">
 <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#0a0a0a">
 <meta name="theme-color" content="#ffffff">
 <link rel="canonical" href="https://sayemwebstore.vercel.app/">
 <meta property="og:type" content="website">
@@ -447,13 +448,14 @@
         <form class="auth-form active" id="loginForm" onsubmit="doLogin(); return false;">
           <div class="input-group">
             <label for="loginEmail">Email or Phone Number</label>
-            <input type="text" id="loginEmail" placeholder="Enter email or number">
+            <input type="text" id="loginEmail" placeholder="Enter email or number" autocomplete="username" maxlength="120">
           </div>
           <div class="input-group">
             <label for="loginPass">Password</label>
-            <input type="password" id="loginPass" placeholder="Enter password">
+            <input type="password" id="loginPass" placeholder="Enter password" autocomplete="current-password" maxlength="128">
           </div>
           <button class="btn btn-primary btn-full" type="submit">🔑 Login</button>
+          <button class="btn btn-ghost btn-full btn-sm" type="button" onclick="sendPasswordReset()">Forgot password?</button>
           <div class="auth-switch">Don't have an account? <a onclick="switchAuth('signup')">Sign Up</a></div>
         </form>
 
@@ -461,15 +463,15 @@
         <form class="auth-form" id="signupForm" onsubmit="doSignup(); return false;">
           <div class="input-group">
             <label for="signName">Full Name</label>
-            <input type="text" id="signName" placeholder="Your full name">
+            <input type="text" id="signName" placeholder="Your full name" autocomplete="name" maxlength="100">
           </div>
           <div class="input-group">
             <label for="signEmail">Email Address</label>
-            <input type="email" id="signEmail" placeholder="your@email.com">
+            <input type="email" id="signEmail" placeholder="your@email.com" autocomplete="email" maxlength="120">
           </div>
           <div class="input-group">
             <label for="signPhone">Phone Number</label>
-            <input type="tel" id="signPhone" placeholder="+880...">
+            <input type="tel" id="signPhone" placeholder="+880..." autocomplete="tel" maxlength="30">
           </div>
           <div class="input-group">
             <label>Gender</label>
@@ -497,7 +499,7 @@
           </div>
           <div class="input-group">
             <label for="signPass">Password</label>
-            <input type="password" id="signPass" placeholder="Create password (min 6 chars)">
+            <input type="password" id="signPass" placeholder="Create password (6–128 chars)" autocomplete="new-password" maxlength="128">
           </div>
           <button class="btn btn-primary btn-full" type="submit">✨ Create Account</button>
           <div class="auth-switch">Already have an account? <a onclick="switchAuth('login')">Login</a></div>
