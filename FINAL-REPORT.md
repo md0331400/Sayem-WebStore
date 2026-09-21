@@ -1,90 +1,158 @@
-# Final Report — Sayem WebStore Production Upgrade
+# Final Report — Sayem WebStore Production Hardening (v4.2 release)
 
-**Repo:** https://github.com/md0331400/Sayem-WebStore
-**Branch / commits:** `feat/seo-attribution-production-upgrade` → fast-forwarded onto `main` (`4008893 → cf152bf → 1c6f3ba`). `main` was **not** branch-protected, so the completed code was pushed directly (no force-push, no history rewrite). The feature branch remains on the remote for review.
-**Live:** https://sayemwebstore.vercel.app/ (deployed by Vercel from `main`; verified after deploy)
-**Diff size:** 25 files, +5,654 / −381
+Branch `main`, commit `5748906` (on top of `3611c40`). Production: https://sayemwebstore.vercel.app/
+This report supersedes all earlier reports. Every claim below was re-verified against the
+current code and test runs in this session — not copied from earlier documents.
 
 ---
 
-## 1. Files changed / added
+## 1. Actual Mobile Bug Causes
 
+The reported symptom (a "desktop-ish", horizontally pannable page on phones) reproduced only
+at **effective viewports below ~300 px** — Chrome page-zoom, Android display-size, split-screen
+and foldable cover screens. Earlier diagnostics started at 320 px, which is why the bug survived
+previous "responsive passes". Each cause below was found with an automated offender walk that
+reports the exact selector and its bounding box, and confirmed with a min-content probe that
+walks `scrollWidth > clientWidth` from `<body>` down to the true driver.
+
+| # | File / selector | Cause | Fix |
+|---|-----------------|-------|-----|
+| 1 | `style.css` → `.app-download-btn` | 140 px intrinsic nowrap pill inside the card-head flex row; its min-content floor pushed every card (and therefore the page) to ≥ ~276 px | `flex-shrink:1; min-width:0; max-width:46%; overflow:hidden; text-overflow:ellipsis` on the pill |
+| 2 | `style.css` → `.nav-shell` | grid `1fr auto 1fr`: the `auto` middle column's floor = brand + actions min-content (~274 px) | `auto minmax(0,1fr) auto` + `min-width:0` chain on brand/title + ellipsis on `.brand-title` |
+| 3 | `style.css` → `.banner-slide` / `.banner-title` / banner `.btn` | grid `1fr auto` + nowrap button labels; at large font scales the label ("⬇️ Download Now") alone needs ~170 px | `minmax(0,1fr) auto`, `max-width:100%` on title, side column stacks under the copy ≤ 360 px |
+| 4 | `style.css` → `.apps-grid` | `repeat(auto-fill, minmax(230px,1fr))` — the 230 px track floor overflows 240–280 px containers | `minmax(min(230px,100%),1fr)` + forced 1 column ≤ 340 px |
+| 5 | `style.css` → `.btn` (login / download labels) | `white-space:nowrap` labels set the hero/detail min-content at font scales 20–28 | `white-space:normal` ≤ 420 px |
+| 6 | `style.css` → `.app-info-row` | `flex-shrink:0` definition column ("Version", "Size"…) floors the detail page at font 28 / 240 px | stacks to `display:block` ≤ 360 px |
+| 7 | `style.css` → `.app-stats`, `.trust-grid` | fixed 3-column rows | `repeat(auto-fit,minmax(min(90px,100%),1fr))` / auto-fit trust grid |
+| 8 | `style.css` → `.modal` | fixed 500 px width + vh-based height | `width:min(calc(100% - 8px),500px)`, `max-height` in `dvh`, `max-width:calc(100vw - 16px)` |
+| 9 | `admin/index.html` grids, inline form grids, inputs | bare `1fr` tracks and input intrinsic widths floored admin pages | all tracks `minmax(0,…)`; inline form grids replaced by `.form-cols-2/.form-cols-3`; `input,select,textarea{min-width:0}`; tables bounded with internal scroll; tab bar scrolls |
+| 10 | `admin/index.html` viewport meta | `maximum-scale=1.0` locked zoom (accessibility bug) while the public page had a second, conflicting viewport tag elsewhere | single normalized viewport `width=device-width, initial-scale=1.0, viewport-fit=cover` on public + admin; **no zoom lock anywhere** |
+
+Overflow-wrap hardening (`overflow-wrap:anywhere` on long-token containers) and breakpoints at
+420/360/340/300 px complete the set. **No `overflow-x:hidden` on body, no `zoom`, no
+`transform:scale`, no forced desktop widths were used anywhere.**
+
+Verification: `tools/mobile-diag.mjs` full matrix — widths 240/280/320/360/375/390/412/430 +
+landscape 568×320 & 844×390 + tablet/desktop, × font scales 16/20/24/28, × routes
+(home, /apps, /games, /search, /app/{slug}, /game/{slug}, signup, login) = **zero** overflowing
+elements and `document.scrollWidth == viewport` everywhere; screenshots at 360 px inspected
+visually (banner title ellipsizes, pills shrink, buttons wrap — layout stays mobile).
+
+---
+
+## 2. File Summary
+
+### Production code
 | File | Change |
-|---|---|
-| `index.html` | M — Sayem WebStore rebrand; full SEO head (title/description/canonical/OG/Twitter/JSON-LD); signup "How did you hear…?" select; latest-additions rail; footer link columns; guest-download copy; **absolute asset URLs** (deep-link fix); skip-link; a11y labels |
-| `app.js` | M — client router with per-route SEO meta + `noindex` on search/404; guest downloads (login removed from download path); gated review/report flows; attribution bootstrap + signup wiring; update-checker bridge (`?pkg=&vc=`); SW registered at `/` scope `/`; network pill hidden while online (click-stealing fix) |
-| `seo-utils.js` | A — shared browser+Node module: slug index (collision-safe), honest rating helpers, update-status matrix, app view-model, detail/not-found renderers used by **both** client and SSR, sitemap builder, JSON-LD builders |
-| `attribution.js` | A — UTM → referrer → Direct classification, source normalization, first-touch immutability, latest-touch external-only, internal-nav exclusion, 90-day TTL, corruption-safe storage, UTM stripping, signup attribution builder |
-| `admin/index.html` | M — rebrand; Users table Source/Campaign/Signup-Date columns + search/source/campaign filters; per-user acquisition detail overlay; **Traffic Sources** dashboard (source/campaign/answer breakdowns, date ranges incl. custom, drill-down to filtered users); Campaign Link Generator with domain validation; Add/Edit App version fields (backward compatible) |
-| `vercel.json` | A — rewrites: `/sitemap.xml` → function; bot-UA conditional SSR for `/app|/game/:slug`; SPA fallbacks; security headers; immutable icon caching |
-| `api/app-page.js` | A — crawler-facing server-rendered app pages (unique meta/OG/JSON-LD/content/breadcrumbs), real 404 for unknown slugs, 301 for wrong type prefix; validates the fetched shell (Deployment-Protection SSO guard) with standalone SSR fallback |
-| `api/sitemap.js` | A — dynamic sitemap from live Firebase records; honest `lastmod`; CDN cache headers |
-| `404.html` | A — branded real-404 page |
-| `robots.txt` | M — allows public assets/routes, blocks `/admin` + `/api/` + `?q=` search, sitemap pointer |
-| `manifest.json`, `service-worker.js` | M — rebrand; cache bust to v13; offline page preserved |
-| `sitemap.xml` | D — static file removed (replaced by dynamic endpoint) |
-| `style.css` | M — v4.1 block: breadcrumbs, detail hero, info table, update banner, login gate, not-found, footer grid, chips scroll, focus styles, responsive fixes |
-| `SECURITY.md` | A — plaintext-password documentation, Firebase Auth migration path, rules guidance, credential-hygiene notes |
-| `database.rules.proposed.json` | A — proposed RTDB rules (**not applied**; would break legacy login until Auth migration) |
-| `README.md` | M — rebrand + v4.1 section |
-| `tools/dev-server.mjs` | A — local server mirroring `vercel.json` routing for tests |
-| `tests/*` (6 files) | A — 112 automated checks (unit / HTTP-integration / Puppeteer E2E) + fixtures + harness + guide |
-| `.vercelignore` | A — keeps `tests/` + `tools/` out of deployments |
+|------|--------|
+| `style.css` | v4.2 hardening block + base-rule fixes (causes 1–8, 10 above) |
+| `index.html` | normalized viewport; honest trust-card copy; FAQ/Terms/Privacy rewritten to match reality |
+| `app.js` | legacy per-device visitor tracker **removed** (IP/UA/hardware/battery + linked account writes); signup aggregate increment; `window._increment` exposed |
+| `attribution.js` | `sendVisitBeacon()` — once-per-session anonymous aggregate beacon |
+| `api/visit.js` | **new** serverless aggregate endpoint (daily source/campaign/landing counters; input-normalizing; no identity) |
+| `admin/index.html` | responsive hardening (cause 9–10); conversion + landing-page tables in Traffic; Visitors tab becomes masked legacy archive with purge path |
+| `service-worker.js` | cache names v13 → v14 (install `skipWaiting`, activate deletes old caches + `clients.claim` — verified) |
+| `tools/dev-server.mjs` | mounts `/api/visit` for local parity with vercel.json |
+
+### Tests
+| File | Purpose |
+|------|---------|
+| `tests/responsive.test.mjs` | **new** regression suite: 16 viewports × 8 routes overflow matrix with selector-level diagnostics, font-scale stress, mobile-state assertions, SPA-navigation consistency, cold deep links, screenshot-rail containment, real old→new SW deploy-transition test, admin matrix incl. zoom-lock check, 57-screenshot archive |
+| `tests/e2e.test.mjs` | + beacon once-per-session, signup aggregate increment, admin conversion/landing tables, public-copy honesty |
+| `tests/functions.test.mjs` | + `/api/visit` aggregation, normalization, GET/OPTIONS, no cookies |
+| `tests/fixtures.mjs` | + `FIXTURE_ANALYTICS` |
+| `tools/mobile-diag.mjs` | **new** standalone diagnostic (device emulation, offender walk, font stress, live-slug mode) |
+
+### Docs
+| File | Change |
+|------|--------|
+| `SECURITY.md` | + §9 download-counter abuse resistance (honest limits), §10 visitor-tracking discontinuation & analytics design, §11 attribution storage summary |
+| `FINAL-REPORT.md` | this document (supersedes previous) |
 
 ---
 
-## 2. What was implemented (mapped to the brief)
+## 3. Feature Summary
 
-1. **Technical SEO / rebrand** — "Sayem WebStore" in every title, OG/Twitter tag, JSON-LD, manifest, footer, admin. Canonical origin `https://sayemwebstore.vercel.app/` everywhere; the stale `samva-app-store.firebaseapp.com` origin remains **only** inside Firebase client config (authDomain/projectId), never in SEO output.
-2. **Unique crawlable pages** — `/app/{slug}` & `/game/{slug}` with unique title/description/canonical/OG/Twitter, visible server-rendered content, `SoftwareApplication` + `WebPage` + `BreadcrumbList` JSON-LD. Crawlers (Googlebot, Facebookbot, Twitterbot, WhatsApp, Telegram, …) receive SSR via `api/app-page.js`; humans get the instant shell + client render from the same shared renderer. Unknown slugs → real HTTP 404 + `noindex`, never another app's content. Duplicate app names get deterministic unique slugs.
-3. **Breadcrumbs + internal linking** — visible breadcrumb nav (deduped when category = list level), related-apps rail, footer/side-nav link columns, latest-additions rail; all cards are real `<a href>` anchors.
-4. **Sitemap & robots** — dynamic `/sitemap.xml` from live records (every app exactly once, no UTM/admin URLs, `lastmod` only from real timestamps); robots allows public assets, blocks `/admin`, `/api/`, search queries.
-5. **Images / CWV / a11y** — descriptive alt text, width/height, lazy-loading for screenshots/icons, icon fallbacks, skip-link, radiogroup stars, focus-visible styles; shell stays static-first, SSR only for bots.
-6. **Firebase efficiency** — catalog cached in `localStorage` and rendered before network; single subscription per node; **no per-pageview writes** (only the existing download counter transaction and one-time visitor record).
-7. **Admin version fields** — Version Name / Version Code (integer ≥ 0 validated) / Package Name (regex validated) on Add & Edit; legacy records render and edit cleanly.
-8. **Update checker** — `?pkg=<package>&vc=<code>` on detail pages; banner only when stored `versionCode` > installed; equal/newer/mismatch → nothing (pure function `resolveUpdateStatus` unit-tested across the matrix).
-9. **Guest downloads** — download anchor open to everyone with counter intact; login required only for reviews/ratings/reports; auth page, FAQ, gates and toasts say so explicitly.
-10. **Attribution** — UTM (source required) > external referrer classification (Search/Social/Messaging/Referral/…) > Direct; facebook/l.facebook/lm.facebook/m.facebook etc. normalized; host-level referrer storage only (no paths/queries); first-touch immutable; latest-touch updated only by external sources; internal navigation ignored; landing page recorded; 90-day TTL; corrupted storage falls back safely; UTMs stripped from the visible URL.
-11. **Signup** — "How did you hear about Sayem WebStore?" select (10 options), preselected from detection, always user-changeable; both the detected acquisition object (`firstTouch`/`latestTouch`/`signup`/`userSelectedSource`/`attributionVersion`) and denormalized `signupSource`/`signupCampaign` stored once at signup and never modified afterwards; attribution failure can never block signup (try/catch + Direct fallback).
-12. **Admin analytics** — Source/Campaign columns, search + source (incl. type buckets, custom, no-data) + campaign filters built from real data; user detail shows the full acquisition record; Traffic Sources tab with 10 stat cards, source/campaign/answer tables, date ranges Today/Yesterday/7d/30d/Month/Custom, click-through drill-down into that source's users; Campaign Link Generator validates destination against the production domain, normalizes params, live-updates and copies to clipboard.
-13. **Security** — `SECURITY.md` documents the plaintext-password weakness and a non-destructive Firebase Auth migration path; `database.rules.proposed.json` provided but **not applied**; no secrets added; PAT handled per instructions.
-14. **PWA / responsive / a11y** — manifest rebranded, SW v13, offline page kept; layouts verified overflow-free at 360/768/1280 with screenshots.
+**Preserved (re-verified by tests):** Firebase catalogue + search + categories; detail pages;
+crawler SSR with SSO-shell guard; sitemap/robots/JSON-LD; PWA offline + theme; ad slots;
+download counters (transactional increments); guest downloads (login-free); gated
+reviews/ratings/reports; attribution (UTM > external referrer > Direct, immutable first touch,
+external-only latest touch, 90-day TTL, corruption-safe) + signup source stored separately from
+the user's manual answer; admin analytics/campaign generator/version fields/update checker;
+admin panel; existing users/apps data untouched.
 
----
+**Added:** anonymous aggregate analytics — once-per-session beacon → daily counters
+(source/campaign/landing/total); signup conversion increments (one write per signup, never per
+pageview); admin Traffic tab gains *Visitor → Signup conversion* and *Landing pages* tables that
+honour the existing Today/Yesterday/7d/30d/Month/Custom range selector and the source/campaign
+row filters. No IP, no cookies, no fingerprint, no identity anywhere in the pipeline.
 
-## 3. Tests ACTUALLY performed (all on this machine, all passing)
-
-**Unit — 61/61** (`node tests/unit.test.mjs`): slugify/collision determinism & order-independence; rating honesty (`null` without real reviews); update-checker matrix (older/equal/newer/missing/garbage); every UTM + referrer family incl. subdomain variants and UTM-beats-referrer; first-touch immutability; internal-nav exclusion; direct-visit handling; 90-day expiry; corrupted/garbage state; signup attribution payload incl. `userSelectedSource`; landing-page tracking; preselect mapping; UTM stripping; sitemap (all records exactly once, no utm/admin, honest lastmod); JSON-LD (aggregateRating only with real reviews, real version/package, breadcrumb parity); guest vs logged-in renderer; not-found view; escaping.
-
-**Integration — 17/17** (`node tests/functions.test.mjs`, real HTTP vs `tools/dev-server.mjs` mirroring `vercel.json`, mock Firebase REST): routing matrix (shell for SPA routes, static shell for human detail URLs, real 404 page+status, `/admin`); Googlebot/Facebookbot SSR pages (unique title/canonical/OG/JSON-LD/h1/breadcrumbs/active classes, related links crawlable); unknown slug 404 for crawlers; malformed slug 404; wrong-type prefix 301 → canonical; duplicate-name slugs distinct; sitemap XML + cache headers + lastmod honesty; security headers; PWA assets + manifest.
-
-**E2E — 34/34** (`node tests/e2e.test.mjs`, Puppeteer/Chromium with the real Firebase/ad hosts dead-ended via `--host-resolver-rules`; every Firebase write replaced by an in-page spy): home branding/SEO head/crawlable cards; SPA navigation with dynamic meta; deep-link cold loads; unknown slug not-found + noindex; category/search routes; back button; **guest download fires the counter with no login redirect**; guest login-gate instead of review form while reviews stay readable; report gating; logged-in session restores the user's own stars; update-banner matrix via `?pkg=&vc=`; **attribution scenarios A–F end-to-end including the exact signup write payload**; referrer normalization (facebook/tiktok/whatsapp/random blog); internal referrer → Direct; corrupted storage → signup still succeeds; responsive 360×780 / 768×1024 / 1280×900 with zero horizontal overflow + screenshots (`/tmp/shots/`); SW registration; admin login, dashboard stats, users columns/filters/search, acquisition detail overlay, legacy-user graceful view, traffic dashboard counts per range (30d/yesterday/all), source-row drill-down, campaign generator validation (external domain rejected), Add/Edit version fields incl. invalid-code rejection, apps list version row, reports panel intact.
-
-**Production verification (live, after deploy):**
-- `/` → `Sayem WebStore — Free Apps & Games Download`, production canonical, manifest name.
-- `/sitemap.xml` → 200 `application/xml`, 19 URLs (8 pages + 11 live apps), zero `utm_`, zero `/admin`.
-- `/robots.txt` → allows public assets, `Disallow: /admin`, sitemap pointer.
-- Googlebot `/app/sam-calculator` → 200 with unique title, canonical, OG, SoftwareApplication/WebPage/BreadcrumbList JSON-LD, visible detail content, breadcrumbs, "No login needed" copy.
-- Facebookbot `/app/kotha-bolbo` → `ratingValue 3.3 / reviewCount 3` (its real reviews); `/app/torch-light` → **no** aggregateRating (no reviews) — honesty verified on live data.
-- Human UA on the same detail URL → untouched fast shell.
-- `/app/definitely-not-here` (bot) → 404 page; `/game/sam-calculator` (bot) → 301 → `/app/sam-calculator`; `/faq` 200; `/zzz-bogus` 404; `/admin` 200 but robots-blocked; no SSO/`_next` leakage in SSR output; `service-worker.js` = `sayem-static-v13`.
-
-**Bugs found by testing and fixed before/after push:** relative asset URLs made human deep links blank (absolute paths now); SW registered with relative scope (now `/`); floating network pill stole clicks from the download button (hidden while online); SSR shell fetch hit Vercel Deployment Protection on deployment-scoped URLs and would have injected meta into an SSO page (now validated + production-URL preference + standalone SSR fallback); game breadcrumb duplication.
+**Removed (privacy remediation):** per-device visitor tracking (`visitors/{deviceToken}` writes
+with IP, user-agent, screen, RAM/CPU, battery and linked account identity). Legacy records stay
+in the database (non-destructive) but the admin UI masks identifying fields and offers purge.
 
 ---
 
-## 4. Real limitations (honest)
+## 4. Test Results (exact counts, this session)
 
-- **Plaintext passwords remain** in `/users` and `/admins` (pre-existing). No destructive migration was performed, per constraints; `SECURITY.md` documents the Firebase Auth migration path and `database.rules.proposed.json` must wait for it. Until then the password column should be treated as public data.
-- **SSR is user-agent conditioned** (standard Vercel rewrite). Crawlers outside the bot-UA list and JS-disabled browsers that don't match get the client shell; content still renders for JS-enabled users and all canonical/meta tags for detail routes are also set client-side.
-- **Update checking needs a signal**: pure web pages cannot detect an installed Android app's version. The checker works via `?pkg=&vc=` parameters (e.g. links opened from the app's WebView/TWA or saved deep links); there is no native install detection.
-- **Attribution is client-side** (`localStorage`, 90-day TTL). Clearing storage or private browsing loses it; referrer-only visits depend on browsers sending `Referer`. It is best-effort by design and degrades to Direct/Unknown.
-- **Admin panel is a static page** protected by the legacy credential check; hardening requires the Firebase Auth + custom-claims migration in `SECURITY.md`.
-- **Ratings/aggregates are honest, therefore sparse**: apps without real reviews show no rating anywhere (no invented stars), which is correct but visually quieter than fabricated numbers would be.
-- **Search page is `noindex`** by design (thin, parameterized content); site search still works for users.
-- **No ranking guarantees**: nothing here promises position improvements; the work removes blockers (crawlability, canonicalization, structured data, speed) and lets real content be indexed.
-- Firebase read traffic for the SSR function is per-request (cached at CDN for 30 min via `s-maxage`); not a per-user cost.
+| Suite | Command | Result |
+|-------|---------|--------|
+| Unit | `node tests/unit.test.mjs` | **61 passed, 0 failed** |
+| Integration/functions | `node tests/functions.test.mjs` | **19 passed, 0 failed** |
+| E2E (real browser, mobile emulation) | `node tests/e2e.test.mjs` | **38 passed, 0 failed** |
+| Responsive regression | `node tests/responsive.test.mjs` | **30 passed, 0 failed** |
+| **Total** | | **148 passed, 0 failed** |
 
-## 5. Credential note
+Plus the standalone diagnostic matrix (`FONT_ALL=1 node tools/mobile-diag.mjs`): 10 device
+profiles × 4 font scales × 8 routes = 0 overflow findings, and a live-production run
+(`LIVE_SLUGS=1`) against sayemwebstore.vercel.app before the fix that reproduced the floors.
 
-The GitHub PAT used for this push appeared in chat during the session. **Revoke/rotate it now** and re-issue a fine-grained token limited to this repository (contents: write, pull-requests: write if you want API-created PRs — the current token could push but not open PRs, which is why no PR exists; `main` already contains the merged code). The repo remote URL is token-free and no token was ever committed.
+---
+
+## 5. Honest Limitations
+
+1. **Download counters** remain client-initiated transactions because the Realtime Database rules
+   are open; atomic increments prevent lost updates but a determined attacker with direct DB
+   access can inflate counts. Server-side enforcement requires deploying
+   `database.rules.proposed.json`, intentionally left to the owner's review.
+2. **Passwords** are still stored in the legacy plaintext format until the owner migrates
+   accounts to Firebase Authentication (non-destructive path documented in SECURITY.md §1).
+3. **Admin authentication** is a shared-credential session, not a security boundary; the panel is
+   additionally `noindex`ed but that is obscurity, not protection (SECURITY.md §5).
+4. Aggregate analytics are **daily totals only** — by design they cannot answer per-user or
+   per-session questions, and legacy `visitors/` rows predating this release still exist in the
+   database until purged.
+5. Range filtering of daily buckets compares UTC day keys against the admin's local-day range
+   boundaries; around midnight in UTC+offset timezones a bucket can appear under the previous
+   local day.
+6. SSR renders the same component as the client, but crawlers receive no client-side interactivity
+   (by design); JSON-LD/sitemap purity and real 404s are covered by tests instead.
+
+---
+
+## 6. Live Verification (performed after deployment of `5748906`)
+
+- **Deployment confirmed:** https://sayemwebstore.vercel.app/ serves the new build
+  (`style.css` contains the v4.2 `minmax(min(230px, 100%), 1fr)` rule; `service-worker.js`
+  serves `sayem-static-v14` with `skipWaiting`, old-cache deletion and `clients.claim`;
+  `last-modified: Mon, 21 Sep 2026 08:29 UTC`).
+- **Routes:** `/`, `/apps`, `/games`, `/search?q=calc`, `/privacy`, `/terms`, `/faq`,
+  `/disclaimer`, `/admin`, `/sitemap.xml`, `/robots.txt`, `/manifest.json` all HTTP 200.
+  Unknown path (`/nonexistent-page-xyz`) returns a real 404 with
+  `<title>404 — Page Not Found | Sayem WebStore`.
+- **Sitemap purity:** 19 `<url>` entries = the 11 live Firebase apps + static pages; no
+  fixture/test slugs, no admin, no auth pages.
+- **New endpoint live:** `OPTIONS /api/visit` → 204 (mounted; probe performed without
+  writing any counter).
+- **Real mobile emulation against production:** `LIVE_SLUGS=1 FONT_ALL=1
+  node tools/mobile-diag.mjs` → **160/160 checks pass, 0 offenders**: device profiles
+  240/280/320/360/375/390/412/430 portrait + 568×320 & 844×390 landscape × font scales
+  16/20/24/28 × home//apps/detail(app)/detail(game)/auth; `document.scrollWidth` equals the
+  viewport on every check.
+- **Screenshots inspected visually** (360 px, production): banner title ellipsizes, download
+  pill shrinks, install prompt and the rewritten "Direct Publisher Links" copy render fully
+  inside the viewport.
+- **PWA returning clients:** the v13→v14 transition (stale cache deleted, new CSS served
+  without a manual refresh) is proven end-to-end by
+  `tests/responsive.test.mjs › old v13 client adopts the new build on next visit`; the
+  production bundle contains the same lifecycle code verified above.
