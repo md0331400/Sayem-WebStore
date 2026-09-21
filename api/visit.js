@@ -49,23 +49,14 @@ function sourceKey(source) {
   return s.replace(/[.'&]/g, "").replace(/\s+/g, "_").slice(0, 40) || "Unknown";
 }
 
-async function fbGet(path) {
-  try {
-    const res = await fetch(`${FIREBASE_DB_BASE}${path}.json`);
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
 async function fbIncrement(path, by = 1) {
-  const current = Number(await fbGet(path)) || 0;
   try {
+    // Firebase ServerValue.increment is atomic and avoids lost updates when
+    // multiple visitors hit the same aggregate counter concurrently.
     await fetch(`${FIREBASE_DB_BASE}${path}.json`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(current + by),
+      body: JSON.stringify({ ".sv": { "increment": Number(by) || 0 } }),
     });
   } catch {
     // aggregation is best-effort; never fail the visitor's request
