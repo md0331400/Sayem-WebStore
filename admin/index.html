@@ -1098,35 +1098,105 @@ async function loadAdLeaders() {
 }
 
 // ============ AUTH ============
+async function openAdminDashboard(adminKey, adminProfile = null) {
+  if (!adminKey) return false;
+  currentAdminKey = adminKey;
+  sessionStorage.setItem('admin_logged_in', 'true');
+  sessionStorage.setItem('admin_key', adminKey);
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('adminDashboard').style.display = 'block';
+  toast('Welcome Admin! 🎉', 'success');
+  loadAll();
+  await logActivity('🔐 Admin Login', adminProfile?.username || '');
+  return true;
+}
+
 async function doAdminLogin() {
-  const u = document.getElementById('adminUser').value.trim(); const p = document.getElementById('adminPass').value;
+  const u = document.getElementById('adminUser').value.trim();
+  const p = document.getElementById('adminPass').value;
   if (!u || !p) { toast('Fill all fields', 'error'); return; }
   if (!firebaseReady) { toast('Connecting to server...', 'info'); return; }
+
   try {
-    const snap = await window._get(window._ref(window._db, 'admins')); let found = null;
-    if (snap.exists()) snap.forEach(c => { const a = c.val() || {}; if (a.username === u || String(a.email || '').toLowerCase() === u.toLowerCase()) found = { ...a, key:c.key }; });
-    const authEmail = found?.email ? String(found.email).toLowerCase() : (u.includes('@') ? u.toLowerCase() : '');
+    // Preferred path for migrated admins: email -> Firebase Auth -> private uid mapping.
+    if (u.includes('@')) {
+      try {
+        const cred = await signInWithEmailAndPassword(window._auth, u.toLowerCase(), p);
+        const uid = cred.user?.uid || '';
+        if (uid) {
+          const mapSnap = await window._get(window._ref(window._db, 'adminUids/' + uid));
+          if (mapSnap.exists()) {
+            const mapped = mapSnap.val();
+            const adminKey = typeof mapped === 'string' ? mapped : String(mapped?.adminKey || '');
+            if (adminKey) {
+              await openAdminDashboard(adminKey);
+              return;
+            }
+          }
+        }
+        // Auth succeeded but mapping is not configured yet; fall through to legacy lookup.
+      } catch (authError) {
+        console.warn('Admin Auth login failed:', authError?.code || 'unknown');
+      }
+    }
+
+    // Legacy compatibility path. This remains until all admins have adminUids mappings.
+    const snap = await window._get(window._ref(window._db, 'admins'));
+    let found = null;
+    if (snap.exists()) snap.forEach(c => {
+      const a = c.val() || {};
+      if (a.username === u || String(a.email || '').toLowerCase() === u.toLowerCase()) {
+        found = { ...a, key: c.key };
+      }
+    });
+
+    if (!found || found.blocked === true) {
+      toast(found?.blocked === true ? 'This admin account is blocked.' : 'Invalid admin credentials!', 'error');
+      return;
+    }
+
+    const authEmail = found.email ? String(found.email).toLowerCase() : (u.includes('@') ? u.toLowerCase() : '');
     if (authEmail) {
       try {
         const cred = await signInWithEmailAndPassword(window._auth, authEmail, p);
-        if (!found) { toast('Admin profile not found.', 'error'); return; }
-        await window._update(window._ref(window._db, 'admins/' + found.key), { uid: cred.user.uid, authProvider:'password', password:null });
-        delete found.password; found.uid = cred.user.uid;
-        currentAdminKey = found.key; sessionStorage.setItem('admin_logged_in','true'); sessionStorage.setItem('admin_key',found.key);
-        document.getElementById('loginPage').style.display='none'; document.getElementById('adminDashboard').style.display='block';
-        toast('Welcome Admin! 🎉','success'); loadAll(); await logActivity('🔐 Admin Login'); return;
-      } catch (authError) { console.warn('Admin Auth login failed:', authError?.code || 'unknown'); }
+        await window._update(window._ref(window._db, 'admins/' + found.key), {
+          uid: cred.user.uid,
+          authProvider: 'password',
+          password: null
+        });
+        delete found.password;
+        found.uid = cred.user.uid;
+        return openAdminDashboard(found.key, found);
+      } catch (authError) {
+        console.warn('Admin Auth migration/login failed:', authError?.code || 'unknown');
+      }
     }
-    if (!found || found.password !== p) { toast('Invalid admin credentials!', 'error'); return; }
+
+    if (found.password !== p) {
+      toast('Invalid admin credentials!', 'error');
+      return;
+    }
+
+    // Legacy password fallback: upgrade the credential when possible.
     if (found.email && !found.uid) {
-      try { const cred = await createUserWithEmailAndPassword(window._auth, String(found.email).toLowerCase(), p); await window._update(window._ref(window._db, 'admins/' + found.key), { uid:cred.user.uid, authProvider:'password', password:null }); found.uid=cred.user.uid; }
-      catch (migrationError) { console.warn('Admin legacy migration skipped:', migrationError?.code || 'unknown'); }
+      try {
+        const cred = await createUserWithEmailAndPassword(window._auth, String(found.email).toLowerCase(), p);
+        await window._update(window._ref(window._db, 'admins/' + found.key), {
+          uid: cred.user.uid,
+          authProvider: 'password',
+          password: null
+        });
+        found.uid = cred.user.uid;
+      } catch (migrationError) {
+        console.warn('Admin legacy migration skipped:', migrationError?.code || 'unknown');
+      }
     }
     delete found.password;
-    currentAdminKey = found.key; sessionStorage.setItem('admin_logged_in','true'); sessionStorage.setItem('admin_key',found.key);
-    document.getElementById('loginPage').style.display='none'; document.getElementById('adminDashboard').style.display='block';
-    toast('Welcome Admin! 🎉','success'); loadAll(); await logActivity('🔐 Admin Login');
-  } catch(e) { console.error(e); toast('Login failed. Please check your connection and try again.', 'error'); }
+    return openAdminDashboard(found.key, found);
+  } catch(e) {
+    console.error(e);
+    toast('Login failed. Please check your connection and try again.', 'error');
+  }
 }
 async function adminLogout() {
   try { if (window._auth?.currentUser) await signOut(window._auth); } catch(e) { console.warn(e); }
@@ -2233,23 +2303,65 @@ async function loadSettingsDisplay() {
 
 // ============ INIT ============
 onAuthStateChanged(window._auth, async (authUser) => {
-  if (!authUser || !firebaseReady) return;
+  if (!authUser || !firebaseReady) {
+    if (!authUser && firebaseReady) {
+      currentAdminKey = null;
+      sessionStorage.removeItem('admin_logged_in');
+      sessionStorage.removeItem('admin_key');
+      document.getElementById('loginPage').style.display = 'flex';
+      document.getElementById('adminDashboard').style.display = 'none';
+    }
+    return;
+  }
+
   try {
-    const snap=await window._get(window._ref(window._db,'admins'));
-    if (snap.exists()) snap.forEach(c => { const a=c.val()||{}; if(a.uid===authUser.uid){ currentAdminKey=c.key; sessionStorage.setItem('admin_logged_in','true'); sessionStorage.setItem('admin_key',c.key); } });
-  } catch(e) { console.warn('Admin auth restore failed:',e); }
+    const mapSnap = await window._get(window._ref(window._db, 'adminUids/' + authUser.uid));
+    if (mapSnap.exists()) {
+      const mapped = mapSnap.val();
+      const adminKey = typeof mapped === 'string' ? mapped : String(mapped?.adminKey || '');
+      if (adminKey) {
+        await openAdminDashboard(adminKey);
+        return;
+      }
+    }
+
+    // Legacy fallback for pre-migration admin records.
+    const snap = await window._get(window._ref(window._db, 'admins'));
+    let matchedKey = null;
+    if (snap.exists()) snap.forEach(c => {
+      const a = c.val() || {};
+      if (a.uid === authUser.uid) matchedKey = c.key;
+    });
+    if (matchedKey) {
+      currentAdminKey = matchedKey;
+      sessionStorage.setItem('admin_logged_in','true');
+      sessionStorage.setItem('admin_key',matchedKey);
+      document.getElementById('loginPage').style.display='none';
+      document.getElementById('adminDashboard').style.display='block';
+      loadAll();
+    } else {
+      try { await signOut(window._auth); } catch {}
+      currentAdminKey = null;
+      sessionStorage.clear();
+      document.getElementById('loginPage').style.display='flex';
+      document.getElementById('adminDashboard').style.display='none';
+      toast('This Firebase account is not registered as an admin.', 'error');
+    }
+  } catch(e) {
+    console.warn('Admin auth restore failed:',e);
+    currentAdminKey = null;
+    sessionStorage.clear();
+    document.getElementById('loginPage').style.display='flex';
+    document.getElementById('adminDashboard').style.display='none';
+  }
 });
 window.addEventListener('firebaseReady', async () => {
   firebaseReady = true;
   console.log('✅ Firebase connected');
-  const sk = sessionStorage.getItem('admin_key');
-  if (sessionStorage.getItem('admin_logged_in') === 'true' && sk) {
-    currentAdminKey = sk;
-    document.getElementById('loginPage').style.display = 'none';
-    document.getElementById('adminDashboard').style.display = 'block';
-    loadAll();
-  } else {
+  // Never trust admin sessionStorage alone. Firebase Auth must confirm the session.
+  if (!window._auth?.currentUser) {
     document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('adminDashboard').style.display = 'none';
   }
 });
 </script>
