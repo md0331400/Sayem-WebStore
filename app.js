@@ -1144,6 +1144,7 @@ async function doSignup() {
   const sourceAnswer = $("signSource")?.value || "";
   if (errorDiv) { errorDiv.textContent = ""; errorDiv.classList.remove("show"); }
   if (!name || !email || !phone || !pass) { if (errorDiv) { errorDiv.textContent = "Please fill all fields."; errorDiv.classList.add("show"); } return; }
+  if (name.length > 100 || phone.length > 30) { if (errorDiv) { errorDiv.textContent = "Please keep your name and phone number within the allowed length."; errorDiv.classList.add("show"); } return; }
   if (!/^\S+@\S+\.\S+$/.test(email)) { if (errorDiv) { errorDiv.textContent = "Please enter a valid email address."; errorDiv.classList.add("show"); } return; }
   if (pass.length < 6 || pass.length > 128) { if (errorDiv) { errorDiv.textContent = "Password must be 6–128 characters."; errorDiv.classList.add("show"); } return; }
   if (!firebaseReady) { toast("Connecting to database...", "info"); return; }
@@ -1912,6 +1913,7 @@ async function addAutoReport(appName, userName, rating, comment) {
       subject: appName,
       message: `${userName} gave ${rating} stars and commented: "${comment || "No comment"}"`,
       timestamp: Date.now(),
+      userId: window._auth?.currentUser?.uid || "",
       type: "auto_review",
       source: "review_section"
     });
@@ -1976,6 +1978,7 @@ window.openAppDetail = (key) => {
 };
 
 function openScreenshot(url) {
+  if (!isSafeAssetUrl(url)) return;
   const lb = document.createElement("div");
   lb.className = "screenshot-lightbox";
   lb.innerHTML = `<button class="screenshot-lightbox-close" aria-label="Close screenshot" onclick="this.parentElement.remove()">✕</button><img src="${escapeHtml(url)}" alt="Enlarged screenshot">`;
@@ -1996,17 +1999,25 @@ function setRating(rating) {
 window.setRating = setRating;
 
 async function submitReview(appName) {
-  if (!currentUser) {
+  const authUid = window._auth?.currentUser?.uid || "";
+  if (!currentUser || !authUid || currentUser.uid !== authUid || currentUser.blocked === true) {
     toast("Please login to review — downloads stay open to everyone!", "error");
     showPage("authPage");
     return;
   }
-  if (!selectedRatingValue) {
+  if (!Number.isInteger(Number(selectedRatingValue)) || Number(selectedRatingValue) < 1 || Number(selectedRatingValue) > 5) {
+    toast("Please select a valid 1–5 star rating.", "error");
+    return;
+  }
     toast("Please select a star rating first!", "error");
     return;
   }
 
   const comment = $("reviewText")?.value.trim() || "";
+  if (comment.length > 2000) {
+    toast("Review is too long. Please keep it under 2000 characters.", "error");
+    return;
+  }
 
   try {
     const appRef = window._ref(window._db, `apps/${currentAppId}`);
@@ -2032,7 +2043,7 @@ async function submitReview(appName) {
       toast("Your review has been updated! ✅", "success");
     } else {
       await window._set(window._push(window._ref(window._db, `apps/${currentAppId}/reviews`)), {
-        userId: currentUser.uid || currentUser.key,
+        userId: authUid,
         username: currentUser.name,
         rating: selectedRatingValue,
         comment,
@@ -2143,7 +2154,8 @@ function closeReportM(e) {
 window.closeReportM = closeReportM;
 
 async function sendReport() {
-  if (!currentUser) {
+  const authUid = window._auth?.currentUser?.uid || "";
+  if (!currentUser || !authUid || currentUser.uid !== authUid || currentUser.blocked === true) {
     closeModal("reportOverlay");
     toast("Please login to submit a report.", "error");
     showPage("authPage");
@@ -2153,6 +2165,10 @@ async function sendReport() {
   const msg = $("rMsg")?.value.trim();
   if (!sub || !msg) {
     toast("Please fill all fields!", "error");
+    return;
+  }
+  if (sub.length > 200 || msg.length > 5000) {
+    toast("Please keep the subject under 200 and message under 5000 characters.", "error");
     return;
   }
   if (!firebaseReady) {
