@@ -1,5 +1,6 @@
 // Unit tests — pure logic: slugs, ratings, update checker, attribution, sitemap, JSON-LD, renderers.
 // Run: node tests/unit.test.mjs
+import fs from "node:fs";
 import { suite, test, assert, assertEq, assertIncludes, assertNotIncludes, summarize } from "./harness.mjs";
 import {
   slugify,
@@ -514,5 +515,47 @@ test("escapeHtml/truncateText", () => {
   assertEq(escapeHtml(`<b>"x"</b>`), "&lt;b&gt;&quot;x&quot;&lt;/b&gt;");
   assert(truncateText("a".repeat(200), 155).length <= 156);
 });
+
+ // ============ PRODUCTION HARDENING STATIC REGRESSIONS ============
+ suite("Production hardening");
+ test("app auth keeps password recovery and blocked-account guard", () => {
+   const c = fs.readFileSync(new URL("../app.js", import.meta.url), "utf8");
+   assertIncludes(c, "sendPasswordResetEmail");
+   assertIncludes(c, "found.blocked === true");
+   assertIncludes(c, "currentUser.uid !== authUid");
+   assertIncludes(c, "comment.length > 2000");
+ });
+ test("public auth form has autocomplete/maxlength and password reset", () => {
+   const c = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+   assertIncludes(c, 'autocomplete="current-password"');
+   assertIncludes(c, 'autocomplete="new-password"');
+   assertIncludes(c, "sendPasswordReset()");
+ });
+ test("service worker protects fresh deployments", () => {
+   const c = fs.readFileSync(new URL("../service-worker.js", import.meta.url), "utf8");
+   assertIncludes(c, "sayem-static-v18");
+   assertIncludes(c, "const freshAsset");
+   assertIncludes(c, "HTML/JS/CSS/manifest");
+   assertIncludes(c, "githubusercontent.com");
+ });
+ test("Vercel response hardening headers are present", () => {
+   const c = fs.readFileSync(new URL("../vercel.json", import.meta.url), "utf8");
+   assertIncludes(c, "X-Permitted-Cross-Domain-Policies");
+   assertIncludes(c, "Cross-Origin-Opener-Policy");
+   assertIncludes(c, "must-revalidate");
+ });
+ test("proposed rules protect user status and validate review/report input", () => {
+   const c = fs.readFileSync(new URL("../database.rules.proposed.json", import.meta.url), "utf8");
+   assertIncludes(c, 'newData.child("blocked").val() === data.child("blocked").val()');
+   assertIncludes(c, "comment").val().length <= 2000");
+   assertIncludes(c, "subject").val().length <= 200");
+   assertIncludes(c, "newData.val() === data.val() + 1");
+ });
+ test("admin panel includes account blocking and password reauthentication", () => {
+   const c = fs.readFileSync(new URL("../admin/index.html", import.meta.url), "utf8");
+   assertIncludes(c, "toggleUserBlocked");
+   assertIncludes(c, "reauthenticateWithCredential");
+   assertIncludes(c, "sendAdminPasswordReset");
+ });
 
 await summarize("Unit tests");
