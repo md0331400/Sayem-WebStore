@@ -357,6 +357,7 @@
           <option value="__none__">No data (legacy users)</option>
         </select>
         <select id="userCampaignFilter" aria-label="Filter by campaign"><option value="">All Campaigns</option></select>
+        <select id="userStatusFilter" aria-label="Filter by account status"><option value="">All Status</option><option value="active">Active</option><option value="blocked">Blocked</option></select>
         <button class="btn btn-outline btn-xs" id="btnClearUserFilters">✕ Clear</button>
         <span class="user-filter-count" id="userFilterCount"></span>
       </div>
@@ -589,7 +590,7 @@ let confirmCallback = null;
 let cachedAds = [], cachedAdStats = {};
 let allUsersCache = null;
 let analyticsCache = undefined;                     // [{key, ...user}] — single fetch reused by Users + Traffic
-let userFilters = { q: '', source: '', campaign: '' };
+let userFilters = { q: '', source: '', campaign: '', status: '' };
 let trafficRange = '30d';
 let currentDetailUserKey = null;
 const SITE_ORIGIN = 'https://sayemwebstore.vercel.app';
@@ -815,9 +816,11 @@ document.addEventListener('click', function (e) {
   }
   if (id.startsWith('viewUserBtn_')) { showUserDetail(id.replace('viewUserBtn_', '')); return; }
   if (id === 'btnClearUserFilters' || target.closest('#btnClearUserFilters')) {
-    userFilters = { q: '', source: '', campaign: '' };
+    userFilters = { q: '', source: '', campaign: '', status: '' };
     const q = document.getElementById('userSearchInput'); if (q) q.value = '';
     const sf = document.getElementById('userSourceFilter'); if (sf) sf.value = '';
+    const cf = document.getElementById('userCampaignFilter'); if (cf) cf.value = '';
+    const st = document.getElementById('userStatusFilter'); if (st) st.value = '';
     renderUsers();
     return;
   }
@@ -848,6 +851,7 @@ document.addEventListener('change', function (e) {
   if (!t || !t.id) return;
   if (t.id === 'userSourceFilter') { userFilters.source = t.value; renderUsers(); }
   if (t.id === 'userCampaignFilter') { userFilters.campaign = t.value; renderUsers(); }
+  if (t.id === 'userStatusFilter') { userFilters.status = t.value; renderUsers(); }
   if (t.id === 'trafficRangeSelect') {
     trafficRange = t.value;
     const from = document.getElementById('trafficFrom');
@@ -1524,6 +1528,7 @@ function filteredUsers() {
   return users.filter(u => {
     if (!userMatchesSource(u, userFilters.source)) return false;
     if (userFilters.campaign && getUserCampaign(u) !== userFilters.campaign) return false;
+    if (userFilters.status && (userFilters.status === 'blocked') !== (u.blocked === true)) return false;
     if (q) {
       const hay = `${u.name || ''} ${u.email || ''} ${u.number || ''} ${getUserSignupSource(u)} ${getUserCampaign(u)} ${getUserAnswer(u)}`.toLowerCase();
       if (!hay.includes(q)) return false;
