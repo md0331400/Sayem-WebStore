@@ -1130,6 +1130,7 @@ a {
 }
 
 .auth-benefits {
+  grid-template-columns: minmax(0, 1fr);
   display: grid;
   gap: 8px;
   margin: 14px 0 16px;
@@ -1554,12 +1555,22 @@ a {
 /* ---------- App detail ---------- */
 .app-detail-layout {
   display: grid;
+  /* v4.3: explicit capped track. The implicit `auto` column used to size
+     itself to the screenshot rail's min-content (N fixed-width thumbs),
+     stretching hero/stats/desc/actions far beyond the viewport. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
+}
+
+/* v4.3: children of the detail grid may shrink and never widen the page */
+.app-detail-layout > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .app-detail-hero {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 14px;
   align-items: center;
 }
@@ -1631,6 +1642,8 @@ a {
 }
 
 .screenshots-scroll {
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   gap: 8px;
   overflow-x: auto;
@@ -1720,6 +1733,7 @@ a {
 }
 
 .reviews-list {
+  grid-template-columns: minmax(0, 1fr);
   display: grid;
   gap: 8px;
   max-height: 300px;
@@ -2792,6 +2806,7 @@ a.section-link:hover { text-decoration: underline; }
 
 /* App information table (version / package / updated) */
 .app-info-table {
+  grid-template-columns: minmax(0, 1fr);
   display: grid;
   gap: 6px;
   margin: 0;
@@ -2820,6 +2835,7 @@ a.section-link:hover { text-decoration: underline; }
 
 /* Update available banner (Android host / ?pkg=&vc=) */
 .update-banner {
+  grid-template-columns: minmax(0, 1fr);
   display: grid;
   gap: 4px;
   padding: 12px 14px;

@@ -31,6 +31,9 @@ export const FIXTURE_APPS = {
     rating: 0,
     screenshot1: "https://cdn.example.test/s1.jpg",
     screenshot2: "https://cdn.example.test/s2.jpg",
+    screenshot3: "https://cdn.example.test/s3.jpg",
+    screenshot4: "https://cdn.example.test/s4.jpg",
+    screenshot5: "https://cdn.example.test/s5.jpg",
     reviews: {
       r1: { userId: "u1", username: "Rahim", rating: 5, comment: "Great game, no lag!", date: NOW - 5 * DAY, source: "review" },
       r2: { userId: "u2", username: "Sadia", rating: 4, comment: "Fun with friends.", date: NOW - 3 * DAY, source: "review" }

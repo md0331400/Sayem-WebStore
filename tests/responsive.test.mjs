@@ -71,7 +71,20 @@ const DIAG = () => {
     }
     bad.push(`${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}${typeof el.className === "string" && el.className ? "." + el.className.trim().split(/\s+/)[0] : ""}[right=${Math.round(r.right)}]`);
   });
-  return { vw, docScrollW: document.documentElement.scrollWidth, offenders: bad.slice(0, 12) };
+  // Condition B guard: the shell must actually use the available width
+  // (a shrink-wrapped "desktop canvas" passes overflow checks while looking tiny).
+  let shellW = 0;
+  for (const sel of [".site-header", ".container", ".page.active", ".admin-header", ".admin-container", "#adminDashboard"]) {
+    const el = document.querySelector(sel);
+    if (el) shellW = Math.max(shellW, Math.round(el.getBoundingClientRect().width));
+  }
+  if (!shellW) {
+    for (const el of document.body.children) {
+      if (getComputedStyle(el).position === "fixed") continue;
+      shellW = Math.max(shellW, Math.round(el.getBoundingClientRect().width));
+    }
+  }
+  return { vw, docScrollW: document.documentElement.scrollWidth, offenders: bad.slice(0, 12), shellW };
 };
 
 /** Desktop-layout detection on a phone viewport (§30). */
@@ -116,6 +129,7 @@ async function assertNoOverflow(page, label) {
   const d = await page.evaluate(DIAG);
   assert(d.docScrollW <= d.vw + 1, `${label}: page scrollWidth ${d.docScrollW} > viewport ${d.vw} (${d.offenders.join(", ")})`);
   assertEq(d.offenders.length, 0, `${label}: offending elements → ${d.offenders.join(", ")}`);
+  assert(d.shellW >= d.vw - 48, `${label}: shell too narrow (desktop-canvas symptom): shell ${d.shellW}px in ${d.vw}px viewport`);
 }
 
 const ROUTES = [
@@ -245,8 +259,13 @@ try {
     fs.rmSync(TMP, { recursive: true, force: true });
     fs.cpSync(ROOT, TMP, { recursive: true });
     const currentSw = fs.readFileSync(path.join(ROOT, "service-worker.js"), "utf8");
+    const curStatic = (currentSw.match(/sayem-static-v\d+/) || [null])[0];
+    const curRuntime = (currentSw.match(/sayem-runtime-v\d+/) || [null])[0];
+    assert(curStatic && curRuntime, "cache names present");
+    const oldStatic = curStatic + "-old";
+    const oldRuntime = curRuntime + "-old";
     // simulate the previously deployed build: same logic, previous cache names
-    fs.writeFileSync(path.join(TMP, "service-worker.js"), currentSw.replace(/sayem-static-v14/g, "sayem-static-v13").replace(/sayem-runtime-v14/g, "sayem-runtime-v13"));
+    fs.writeFileSync(path.join(TMP, "service-worker.js"), currentSw.split(curStatic).join(oldStatic).split(curRuntime).join(oldRuntime));
     const SW_PORT = 8173;
     const FB_PORT = 8174;
     const mock2 = http.createServer((req, res) => { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(FIXTURE_APPS)); });
@@ -263,17 +282,17 @@ try {
       await page.setUserAgent(MOBILE_UA);
       await page.setViewport({ width: 360, height: 780, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
       await page.goto(`http://127.0.0.1:${SW_PORT}/`, { waitUntil: "domcontentloaded" });
-      await page.waitForFunction(async () => (await caches.keys()).includes("sayem-static-v13"), { timeout: 15000 });
+      await page.waitForFunction(async (k) => (await caches.keys()).includes(k), { timeout: 15000 }, oldStatic);
 
       // ---- deploy happens: new SW (v14) + changed CSS ----
       fs.writeFileSync(path.join(TMP, "service-worker.js"), currentSw);
       fs.appendFileSync(path.join(TMP, "style.css"), "\n/* resp-marker-xyz */\n");
       await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); if (r) await r.update(); });
       await page.reload({ waitUntil: "domcontentloaded" });
-      await page.waitForFunction(async () => {
+      await page.waitForFunction(async (cur, old) => {
         const keys = await caches.keys();
-        return keys.includes("sayem-static-v14") && !keys.includes("sayem-static-v13");
-      }, { timeout: 20000 });
+        return keys.includes(cur) && !keys.includes(old);
+      }, { timeout: 20000 }, curStatic, oldStatic);
       const css = await page.evaluate(async () => (await fetch("/style.css")).text());
       assertIncludes(css, "resp-marker-xyz", "returning client receives the new CSS");
       const adminCached = await page.evaluate(async () => !!(await caches.match(new Request("http://127.0.0.1:8173/admin"))));

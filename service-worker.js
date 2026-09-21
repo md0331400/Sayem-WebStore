@@ -1,8 +1,8 @@
 // Service worker — Sayem WebStore PWA
 // Cache version bumped for the v4.1 SEO/router release so every client
 // picks up the new shell, seo-utils.js and attribution.js immediately.
-const STATIC_CACHE = 'sayem-static-v14';
-const RUNTIME_CACHE = 'sayem-runtime-v14';
+const STATIC_CACHE = 'sayem-static-v15';
+const RUNTIME_CACHE = 'sayem-runtime-v15';
 const CORE_ASSETS = [
   './',
   './index.html',
