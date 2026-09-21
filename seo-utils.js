@@ -568,7 +568,7 @@ export function appJsonLd(vm) {
   };
 
   const images = [];
-  if (app.imageUrl && String(app.imageUrl).startsWith("http")) images.push(String(app.imageUrl));
+  if (isSafeAssetUrl(app.imageUrl)) images.push(String(app.imageUrl));
   vm.screenshots.forEach((s) => images.push(s));
   if (images.length) softwareApplication.image = images;
 
@@ -652,6 +652,7 @@ export function buildSitemapXml(apps, staticUrls = null) {
   });
 
   for (const app of apps || []) {
+    if (app && app.published === false) continue;
     const path = getAppPath(app, slugIndex);
     if (path === "/") continue;
     const ts = Number(app.updatedAt) || Number(app.createdAt) || 0;
