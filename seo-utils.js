@@ -446,7 +446,7 @@ export function renderAppDetailInner(vm) {
   // (GitHub Raw APK). No target="_blank", no proxy, no inline JS — the click
   // is handled by one delegated listener keyed on data-download-key.
   const downloadHtml = hasLink
-    ? `<a class="btn btn-primary" href="${escapeHtml(app.link)}" download data-download-key="${escapeHtml(String(app.key))}" data-download-url="${escapeHtml(app.link)}">⬇️ Download Now</a>`
+    ? `<a class="btn btn-primary" href="${escapeHtml(app.link)}" data-download-key="${escapeHtml(String(app.key))}" data-download-url="${escapeHtml(app.link)}">⬇️ Download Now</a>`
     : `<button class="btn btn-primary" disabled title="Download link not available yet">⬇️ Download unavailable</button>`;
 
   return `
