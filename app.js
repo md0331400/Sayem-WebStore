@@ -627,13 +627,13 @@ function updateInstallUI() {
   const bannerText = $("installBannerText");
   if (bannerText) {
     if (deferredInstallPrompt) {
-      bannerText.textContent = "Install this PWA for an app-like experience with cached offline access.";
+      bannerText.textContent = "Install for quick access and offline-ready loading.";
     } else if (isIOS()) {
-      bannerText.textContent = "On iPhone or iPad, tap Share and choose “Add to Home Screen”.";
+      bannerText.textContent = "Tap Share → Add to Home Screen.";
     } else if (isSafariBrowser()) {
       bannerText.textContent = "In Safari, use Share and select “Add to Dock” to install the app.";
     } else {
-      bannerText.textContent = "Use your browser install option for quick access and offline-ready performance.";
+      bannerText.textContent = "Use your browser menu to install the app.";
     }
   }
 
@@ -1958,6 +1958,10 @@ async function performDownloadHandoff(key, link, event) {
   }
   const modifier = event && (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey);
   if (modifier) return true; // browser-managed tab: not our download action
+
+  // Stop native anchor navigation before the async counter work. Otherwise
+  // the browser can start the file download before this hand-off completes.
+  if (event) event.preventDefault();
 
   // Count first, then navigate: awaiting the transaction keeps the increment
   // from being cancelled by the same-tab navigation. Bounded wait so a slow
