@@ -768,7 +768,7 @@ window.renderSearchResults = renderSearchResults;
 function renderPopularSearches() {
   const wrap = $("popularSearches");
   if (!wrap) return;
-  const popular = [...allApps].sort((a, b) => (b.downloads || 0) - (a.downloads || 0)).slice(0, 8);
+  const popular = [...getPublicApps(allApps)].sort((a, b) => (b.downloads || 0) - (a.downloads || 0)).slice(0, 8);
   wrap.innerHTML = popular.length
     ? popular
         .map((app) => `<button class="popular-chip" onclick="setSearchQuery(${toJsString(app.name)})">${escapeHtml(app.name)}</button>`)
@@ -1422,7 +1422,7 @@ function subscribeAds() {
 }
 
 function getCardIconHtml(app, shellClass = "app-icon-shell", extraAttrs = "") {
-  if (app.imageUrl && app.imageUrl.startsWith("http")) {
+  if (isSafeAssetUrl(app.imageUrl)) {
     return `
       <div class="${shellClass}">
         <img src="${escapeHtml(app.imageUrl)}" alt="${escapeHtml(app.name || "App")} icon" ${extraAttrs} onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';">
@@ -1592,7 +1592,7 @@ function renderHeroBanner(source = allApps) {
             : `<span>${escapeHtml(app.icon || "📱")}</span>`}
         </div>
         ${hasLink
-          ? `<a class="btn btn-primary" href="${escapeHtml(app.link)}" download data-download-key="${escapeHtml(String(app.key))}" data-download-url="${escapeHtml(app.link)}">Download</a>`
+          ? `<a class="btn btn-primary" href="${escapeHtml(app.link)}" data-download-key="${escapeHtml(String(app.key))}" data-download-url="${escapeHtml(app.link)}">Download</a>`
           : `<button class="btn btn-primary" disabled>Download</button>`}
       </div>
     </div>`;
@@ -1621,14 +1621,17 @@ function buildChipsHtml(containerPageKey, source) {
 }
 
 function renderCategoryFilters(source = allApps) {
+  const publicSource = getPublicApps(source);
   const homeWrap = $("categoryFilters");
-  if (homeWrap) homeWrap.innerHTML = buildChipsHtml("home", source);
+  if (homeWrap) homeWrap.innerHTML = buildChipsHtml("home", publicSource);
 
+  const appsSource = publicSource.filter((a) => !isGameApp(a));
+  const gamesSource = publicSource.filter(isGameApp);
   const appsWrap = $("appsCategoryFilters");
-  if (appsWrap) appsWrap.innerHTML = source.some((a) => !isGameApp(a)) ? buildChipsHtml("apps", source.filter((a) => !isGameApp(a))) : "";
+  if (appsWrap) appsWrap.innerHTML = appsSource.length ? buildChipsHtml("apps", appsSource) : "";
 
   const gamesWrap = $("gamesCategoryFilters");
-  if (gamesWrap) gamesWrap.innerHTML = source.some(isGameApp) ? buildChipsHtml("games", source.filter(isGameApp)) : "";
+  if (gamesWrap) gamesWrap.innerHTML = gamesSource.length ? buildChipsHtml("games", gamesSource) : "";
 }
 
 function renderFeaturedGrid(source = allApps) {
@@ -1699,15 +1702,16 @@ function renderApps(apps) {
   renderLatestGrid(allApps);
 
   if (grid) {
+    const publicCount = getPublicApps(allApps).length;
     if (count) {
-      count.textContent = allApps.length
-        ? apps.length === allApps.length
+      count.textContent = publicCount
+        ? apps.length === publicCount
           ? `${apps.length} apps available`
-          : `Showing ${apps.length} of ${allApps.length} apps`
+          : `Showing ${apps.length} of ${publicCount} apps`
         : "0 apps available";
     }
 
-    if (!allApps.length) {
+    if (!publicCount) {
       grid.innerHTML = '<div class="empty-state">No apps yet. Admin can add some anytime.</div>';
     } else if (!apps.length) {
       grid.innerHTML = '<div class="empty-state">No apps match your search or selected category.</div>';
