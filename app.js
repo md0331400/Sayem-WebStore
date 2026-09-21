@@ -2036,9 +2036,6 @@ async function submitReview(appName) {
     toast("Please select a valid 1–5 star rating.", "error");
     return;
   }
-    toast("Please select a star rating first!", "error");
-    return;
-  }
 
   const comment = $("reviewText")?.value.trim() || "";
   if (comment.length > 2000) {
