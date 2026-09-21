@@ -251,9 +251,15 @@ try {
         const r = el.getBoundingClientRect();
         return { w: Math.round(r.width), right: Math.round(r.right), bottom: Math.round(r.bottom), vw: document.documentElement.clientWidth, vh: document.documentElement.clientHeight };
       });
-      assert(m.w <= Math.min(340, m.vw - 24) + 2, `${w}: install card compact (got ${m.w}px)`);
+      assert(m.w <= Math.min(280, m.vw - 24) + 2, `${w}: install card compact (got ${m.w}px)`);
       assert(m.right <= m.vw, `${w}: card inside viewport`);
       assert(m.bottom <= m.vh, `${w}: card above viewport bottom`);
+    const extra = await page.evaluate(() => ({
+      h: Math.round(document.getElementById("installBanner").getBoundingClientRect().height),
+      direction: getComputedStyle(document.querySelector(".install-banner-actions")).flexDirection,
+    }));
+    assert(extra.h <= 150, `${w}: install card stays short (got ${extra.h}px)`);
+    assertEq(extra.direction, "row", `${w}: install actions stay inline`);
       await context.close();
     }
   });
