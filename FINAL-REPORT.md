@@ -203,3 +203,59 @@ additionally reports shell narrowness; the SW deploy-transition test is version-
 zero offenders, shell == viewport; live full matrix (`LIVE_SLUGS=1 FONT_ALL=1`) 160/160 clean;
 local suites unit 61 / functions 19 / e2e 38 / responsive 30 = 148 passed; SW now
 `sayem-static-v15`.
+
+---
+
+## 8. Addendum — v4.4 (commit `d7c34f2`): download & update architecture separation
+
+**Website download system (Direct Download).** Download controls (home banner,
+app/game cards via detail, detail page) now render as same-tab hand-off anchors
+(`data-download-key`, no `target="_blank"`, no inline JS — one delegated
+listener in `app.js`). The stored GitHub Raw URL is handed to the browser
+directly; Chrome/Android starts the APK download from GitHub Raw. The counter
+transaction is awaited (bounded 1.2 s race) *before* navigation, so every
+genuine click increments exactly once and the write cannot be cancelled by the
+hand-off. Guests unaffected; invalid/missing URLs render a disabled button.
+No Vercel proxy, no iframe, no binary relay exists or was added.
+Admin Add/Edit shows an explicit **Download Type: Direct Download** (stored
+value `direct`) plus a **Download URL (GitHub Raw APK)** field with http(s)-only
+validation (`javascript:`/`data:`/control chars rejected); versionCode integer
+and packageName Android-id validation retained; edits merge so downloads,
+reviews and createdAt are preserved. Old records without `downloadType` keep
+working via `link`.
+
+**Update system = JSON API only.** New `GET /api/app-update` (public,
+read-only, CORS `*`, `Cache-Control: no-store`) reads the same Firebase `apps`
+catalog and imports the single comparison rule from `seo-utils.js`
+(`latestVersionCode > installedVersionCode`). Responses follow the stable
+contract (found/updateAvailable/reason/latest*/downloadUrl/appUrl); 400 JSON
+for bad package/versionCode, `found:false, reason:"not-listed"` for unknown
+packages, 500 JSON without internals on catalog failure. The website no longer
+renders any update UI: `?pkg=&vc=` parsing, the on-page banner and the
+"Update Now" label were removed; `window.SayemWebStore.checkAppUpdate` is now a
+thin fetch-client of the API (tests/compat only). `service-worker.js` bypasses
+`githubusercontent.com`, `github.com` and `*.apk` entirely (APKs are never
+cached/proxied); cache bumped v15 → v16. PWA install popup is a compact
+bottom-right card on phones (≤340 px, safe-area aware), never a full-width bar.
+Docs: `DOWNLOADS-AND-UPDATES.md`.
+
+**Tests (exact counts after v4.4):** unit 62 · functions 25 · e2e 40 ·
+responsive 31 = **158 passed, 0 failed**. New coverage: API contract cases 1–5
++ headers + 405 + JSON-only; exactly-once counter with same-tab hand-off and
+zero popup tabs (sessionStorage-mirrored transaction count survives the
+navigation); `?pkg=&vc=` produces no update UI; invalid URL never navigates;
+install-popup compactness at 320/360/390/414.
+
+**Live verification (post-deploy):** `/api/app-update` returns JSON with
+`content-type: application/json`, `cache-control: no-store`,
+`access-control-allow-origin: *`; 400 for `javascript:` package and missing
+versionCode; `found:false/not-listed` for unknown package; 405 for POST; bot
+SSR detail pages contain no update UI; client bundle has zero
+`target="_blank"` download anchors; SW serves v16 with the GitHub/APK bypass;
+15/15 mobile+desktop checks pass at 320/360/390/414/1280 on `/`,
+`/app/kotha-bolbo`, `/game/samva-online-tic-tac-toe` (no overflow, install card
+compact and inside viewport, download anchors key-present/target-free).
+Note: no live app record carries a `packageName` yet, so the `found:true`
+path is demonstrated against the mocked catalog in `tests/functions.test.mjs`;
+once the admin sets packageName + versionCode on any app, the same endpoint
+serves it with no code changes.
