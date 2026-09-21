@@ -566,7 +566,7 @@
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import{getDatabase,ref,push,set,get,remove,update}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,onAuthStateChanged,signOut,updatePassword}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 const firebaseConfig={
   apiKey:"AIzaSyDo4VtvFjkHK_qPKw_8OvjWB3DF93m0_vE",
   authDomain:"samva-app-store.firebaseapp.com",
@@ -1148,10 +1148,15 @@ async function updateStats() {
 // trimmed http/https only; javascript:/data:/control chars rejected.
 function isValidDownloadUrl(v) {
   const u = String(v || '').trim();
-  if (!u) return true; // empty allowed = "no download yet"
-  if (u.length > 2048) return false;
-  if (/[\u0000-\u0020\u007f]/.test(u)) return false;
+  if (!u) return true;
+  if (u.length > 2048 || /[\u0000-\u0020\u007f]/.test(u)) return false;
   return /^https?:\/\//i.test(u);
+}
+
+function isValidHttpUrl(v) {
+  const u = String(v || '').trim();
+  if (!u || u.length > 2048 || /[\u0000-\u0020\u007f]/.test(u)) return false;
+  try { const p = new URL(u); return p.protocol === 'http:' || p.protocol === 'https:'; } catch { return false; }
 }
 
 // ============ APPS ============
@@ -1176,6 +1181,9 @@ async function addApp() {
   const s4 = document.getElementById('aScreen4').value.trim();
   const s5 = document.getElementById('aScreen5').value.trim();
   if (!n || !d) { toast('Name and Description are required', 'error'); return; }
+  for (const [label, value] of [['Image URL', img], ['Screenshot 1', s1], ['Screenshot 2', s2], ['Screenshot 3', s3], ['Screenshot 4', s4], ['Screenshot 5', s5]]) {
+    if (value && !isValidHttpUrl(value)) { toast(label + ' must be a valid http(s) URL.', 'error'); return; }
+  }
   if (!isValidDownloadUrl(lk)) { toast('Download URL must be a valid http(s) link (GitHub Raw APK URL)', 'error'); return; }
   let vc = null;
   if (vcRaw !== '') {
@@ -1321,6 +1329,9 @@ async function saveEditApp() {
   const s4 = document.getElementById('editScreen4')?.value.trim();
   const s5 = document.getElementById('editScreen5')?.value.trim();
   if (!n || !d) { toast('Name and Description are required', 'error'); return; }
+  for (const [label, value] of [['Image URL', img], ['Screenshot 1', s1], ['Screenshot 2', s2], ['Screenshot 3', s3], ['Screenshot 4', s4], ['Screenshot 5', s5]]) {
+    if (value && !isValidHttpUrl(value)) { toast(label + ' must be a valid http(s) URL.', 'error'); return; }
+  }
   if (!isValidDownloadUrl(lk)) { toast('Download URL must be a valid http(s) link (GitHub Raw APK URL)', 'error'); return; }
   let vc = null;
   if (vcRaw !== '') {
@@ -2071,31 +2082,31 @@ async function saveMaxPerSlot() {
 
 // ============ SETTINGS ============
 async function updateAdmin() {
-  const cp = document.getElementById('currentAdminPass').value.trim();
   const nu = document.getElementById('newAdminUser').value.trim();
   const np = document.getElementById('newAdminPass').value.trim();
-  if (!cp) { toast('Enter current password', 'error'); return; }
+  if (!nu && !np) { toast('Nothing to update', 'info'); return; }
+  if (!window._auth?.currentUser) { toast('Admin password changes require a Firebase Auth session.', 'error'); return; }
+  if (np && np.length < 6) { toast('New password must be at least 6 characters.', 'error'); return; }
   try {
-    const s = await window._get(window._ref(window._db, `admins/${currentAdminKey}`));
-    if (s.val()?.password === cp) {
-      const u = {};
-      if (nu) u.username = nu;
-      if (np) u.password = np;
-      if (Object.keys(u).length) {
-        await window._update(window._ref(window._db, `admins/${currentAdminKey}`), u);
-        toast('✅ Credentials updated!', 'success');
-        await logActivity('🔐 Updated Admin Credentials');
-        document.getElementById('currentAdminPass').value = '';
-        document.getElementById('newAdminUser').value = '';
-        document.getElementById('newAdminPass').value = '';
-      } else { toast('Nothing to update', 'info'); }
-    } else { toast('Wrong current password', 'error'); }
-  } catch (e) { toast('Error: ' + e.message, 'error'); }
+    if (np) await updatePassword(window._auth.currentUser, np);
+    const updates = {};
+    if (nu) updates.username = nu;
+    if (Object.keys(updates).length) await window._update(window._ref(window._db, `admins/${currentAdminKey}`), updates);
+    toast('✅ Admin credentials updated. Password is managed by Firebase Auth.', 'success');
+    await logActivity('🔐 Updated Admin Credentials', np ? 'Password changed via Firebase Auth' : 'Username changed');
+    document.getElementById('currentAdminPass').value = '';
+    document.getElementById('newAdminUser').value = '';
+    document.getElementById('newAdminPass').value = '';
+  } catch(e) {
+    console.error(e);
+    const msg = e?.code === 'auth/requires-recent-login' ? 'Please log in again before changing the password.' : 'Could not update credentials.';
+    toast(msg, 'error');
+  }
 }
-
 async function saveSettings() {
   const n = document.getElementById('websiteNameInput').value.trim() || 'Sayem WebStore';
   const logo = document.getElementById('logoUrlInput')?.value.trim();
+  if (logo && !isValidHttpUrl(logo)) { toast('Logo URL must be a valid http(s) URL.', 'error'); return; }
   localStorage.setItem('website_name', n);
   try {
     await window._set(window._ref(window._db, 'settings/websiteName'), n);
