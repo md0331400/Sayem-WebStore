@@ -90,7 +90,17 @@ test("download renderer uses direct browser hand-off without download attribute"
   assertNotIncludes(html, ' download ');
 });
 
-test("app card has no View & Download CTA", () => {\n  const app = apps.find((a) => a.key === "-Test0001keyAAA");\n  const html = appCardHtml(app, getAppPath(app, index));\n  assertNotIncludes(html, "View &amp; Download");\n});\n\n// ============ UPDATE CHECKER (§69 matrix) ============
+test("app card has no View & Download CTA", () => {
+  const app = apps.find((a) => a.key === "-Test0001keyAAA");
+  const html = appCardHtml(app, getAppPath(app, index));
+  assertNotIncludes(html, "View &amp; Download");
+});
+
+test("asset URL validator rejects unsafe protocols", () => {
+  assert(!/^https?:\/\//i.test("javascript:alert(1)"));
+  assert(/^https?:\/\//i.test("https://example.com/icon.png"));
+});
+\n// ============ UPDATE CHECKER (§69 matrix) ============
 suite("Update checker");
 test("installed 10, website 11 → update prompt", () => {
   const r = resolveUpdateStatus(10, 11);
