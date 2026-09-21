@@ -14,6 +14,7 @@ import {
   getAverageRating,
   getReviewList,
   isSafeDownloadUrl,
+  isSafeAssetUrl,
   buildAppViewModel,
   renderAppDetailInner,
   renderNotFoundInner,
