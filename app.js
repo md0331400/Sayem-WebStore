@@ -626,7 +626,7 @@ function updateInstallUI() {
   ["installBtn", "bannerInstallBtn"].forEach((id) => {
     const btn = $(id);
     if (!btn) return;
-    btn.textContent = label;
+    btn.innerHTML = `<img src="/icons/download.gif" alt="" width="18" height="18" class="ui-gif-icon"> ${escapeHtml(label)}`;
     btn.classList.toggle("hidden", !shouldShow);
   });
 
@@ -1010,7 +1010,7 @@ function buildSideMenu() {
   if (canShowInstallUI()) {
     const installBtn = document.createElement("button");
     installBtn.className = "nav-item";
-    installBtn.innerHTML = `<span class="nav-icon">📲</span>${installLabel}`;
+    installBtn.innerHTML = `<span class="nav-icon">${menuIconHtml("icons/download.gif", "Install")}</span>${escapeHtml(installLabel)}`;
     installBtn.onclick = () => triggerInstallPrompt();
     nav.appendChild(installBtn);
   }
