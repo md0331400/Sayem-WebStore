@@ -8,7 +8,7 @@ Apps & Games ডাউনলোড প্ল্যাটফর্ম — Firebas
 - 🔍 Live search + category filter
 - 🔐 Login / Sign Up (Firebase Authentication + Realtime Database profile)
 - ⭐ App rating ও user review system
-- ⬇️ Guest downloads + download counter (login ছাড়াই ডাউনলোড; রিভিউ/রেটিং/রিপোর্টের জন্য লগইন লাগবে)
+- ⬇️ Guest APK downloads + download counter (login ছাড়াই download; reviews/ratings/reports-এর জন্য login লাগে)
 - 📱 PWA support — Install App button, offline mode, cached data, update-safe service worker
 - 📣 Report Us ফর্ম (report সরাসরি Firebase-এ যায়)
 - 📈 Anonymous aggregate traffic attribution (no IP/fingerprint tracking)
@@ -23,7 +23,7 @@ Apps & Games ডাউনলোড প্ল্যাটফর্ম — Firebas
 ├── manifest.json     → PWA manifest
 ├── service-worker.js → Offline cache
 ├── robots.txt        → Search engine
-├── sitemap.xml       → Sitemap
+├── api/sitemap.js    → Dynamic sitemap endpoint
 └── icons/            → Logo, favicon, PWA icons
 ```
 
@@ -46,7 +46,9 @@ python3 -m http.server 8000
 
 ## 🌍 Live Website বানানো (Deploy)
 
-### Option 1: GitHub Pages (Free, সবচেয়ে সহজ)
+### Recommended deploy: Vercel
+
+The project is structured for Vercel and currently uses Vercel serverless APIs for the sitemap, traffic beacon and app-page crawler rendering.
 
 1. Code টা তোমার GitHub repo-তে push করো
 2. Repo → **Settings** → **Pages**
@@ -54,7 +56,7 @@ python3 -m http.server 8000
 4. Save — কয়েক মিনিটে সাইট live হবে:
    `https://<your-username>.github.io/Sayem-WebStore/`
 
-### Option 2: Firebase Hosting (Free)
+### Other deployment options
 
 ```bash
 npm install -g firebase-tools
@@ -151,3 +153,13 @@ domain. No per-pageview analytics writes are performed anywhere.
 **Tests.** `node tests/unit.test.mjs`, `node tests/functions.test.mjs`,
 `node tests/e2e.test.mjs` — see `tests/README.md`. Local dev server that mirrors the
 Vercel routing: `node tools/dev-server.mjs`.
+
+## Production status
+
+- Cloudflare is intentionally not part of the current deployment.
+- Public app/game pages remain crawlable with dynamic sitemap + bot-facing rendering.
+- APK download hand-off stays direct to the stored URL; the service worker does not intercept GitHub/APK requests.
+- PWA core assets use network-first loading with cached offline fallback.
+- New user accounts use Firebase Authentication and do not store a plaintext password in the profile record.
+- Legacy authentication fallback remains until the Firebase Auth migration is fully completed.
+- `database.rules.proposed.json` is a deployment candidate only; review `PRODUCTION-CHECKLIST.md` before applying it.
