@@ -1,8 +1,8 @@
 // Service worker — Sayem WebStore PWA
 // Cache version bumped for the v4.1 SEO/router release so every client
 // picks up the new shell, seo-utils.js and attribution.js immediately.
-const STATIC_CACHE = 'sayem-static-v17';
-const RUNTIME_CACHE = 'sayem-runtime-v17';
+const STATIC_CACHE = 'sayem-static-v18';
+const RUNTIME_CACHE = 'sayem-runtime-v18';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -100,22 +100,24 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     const staticCache = await caches.open(STATIC_CACHE);
     const runtimeCache = await caches.open(RUNTIME_CACHE);
+    const freshAsset = request.destination === 'script' ||
+      request.destination === 'style' ||
+      request.destination === 'document' ||
+      request.destination === 'manifest';
 
-    if (request.mode === 'navigate') {
-      const cachedPage = (await runtimeCache.match(request)) || (await staticCache.match('./index.html')) || (await caches.match(request));
-      if (cachedPage) {
-        event.waitUntil(revalidate(request));
-        return cachedPage;
-      }
-
+    // HTML/JS/CSS/manifest are network-first so deployments are picked up
+    // immediately; cached copies remain the offline fallback.
+    if (freshAsset) {
       try {
         const networkResponse = await fetch(request);
-        if (networkResponse && networkResponse.ok) {
+        if (networkResponse && (networkResponse.ok || networkResponse.type === 'opaque')) {
           await runtimeCache.put(request, networkResponse.clone());
         }
         return networkResponse;
       } catch {
-        return staticCache.match('./index.html');
+        const cached = (await runtimeCache.match(request)) ||
+          (await staticCache.match(request, { ignoreSearch: true }));
+        return cached || (request.mode === 'navigate' ? await staticCache.match('./index.html') : Response.error());
       }
     }
 
