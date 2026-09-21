@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, push, set, get, remove, update, onValue, runTransaction, increment } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, deleteUser } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, onAuthStateChanged, signOut, deleteUser } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
   SITE_ORIGIN,
   SITE_NAME_DEFAULT,
@@ -51,6 +51,7 @@ window._runTransaction = runTransaction;
 window._increment = increment;
 window._createUserWithEmailAndPassword = createUserWithEmailAndPassword;
 window._signInWithEmailAndPassword = signInWithEmailAndPassword;
+window._sendPasswordResetEmail = sendPasswordResetEmail;
 
 const DEFAULT_WEBSITE_NAME = SITE_NAME_DEFAULT; // "Sayem WebStore"
 const DEFAULT_LOGO = "icons/icon-192.png";
@@ -857,6 +858,14 @@ function loadSession() {
 
 function saveSession(user) {
   const clean = sanitizeSessionUser(user);
+  if (clean?.blocked === true) {
+    currentUser = null;
+    window.currentUser = null;
+    try { localStorage.removeItem("samweb_user"); } catch {}
+    updateHeaderUser();
+    buildSideMenu();
+    return;
+  }
   currentUser = clean;
   window.currentUser = clean;
   if (clean) localStorage.setItem("samweb_user", JSON.stringify(clean));
@@ -874,11 +883,30 @@ async function syncAuthProfile(authUser) {
       if (u.uid === authUser.uid || (!u.uid && String(u.email || "").toLowerCase() === String(authUser.email || "").toLowerCase())) found = { ...u, key: child.key };
     });
     if (!found) return false;
+
+    if (found.blocked === true) {
+      try { await signOut(window._auth); } catch {}
+      clearSession();
+      toast("This account has been blocked. Please contact support.", "error", 5000);
+      return false;
+    }
+
+    const profileUpdates = {};
     if (!found.uid) {
-      await window._update(window._ref(window._db, `users/${found.key}`), { uid: authUser.uid, authProvider: "password" });
+      profileUpdates.uid = authUser.uid;
+      profileUpdates.authProvider = "password";
       found.uid = authUser.uid;
       found.authProvider = "password";
     }
+    // Remove legacy plaintext password as soon as Firebase Auth login succeeds.
+    if (Object.prototype.hasOwnProperty.call(found, "password")) {
+      profileUpdates.password = null;
+      delete found.password;
+    }
+    if (Object.keys(profileUpdates).length) {
+      await window._update(window._ref(window._db, `users/${found.key}`), profileUpdates);
+    }
+
     saveSession(found);
     return true;
   } catch (e) {
@@ -1053,6 +1081,10 @@ async function doLogin() {
     } else if (legacyFound.password !== pass) legacyFound = null;
 
     if (!legacyFound) { toast("Invalid email/phone or password.", "error"); return; }
+    if (legacyFound.blocked === true) {
+      toast("This account has been blocked. Please contact support.", "error", 5000);
+      return;
+    }
 
     if (legacyFound.email && !legacyFound.uid) {
       try {
@@ -1077,6 +1109,32 @@ async function doLogin() {
 }
 window.doLogin = doLogin;
 
+async function sendPasswordReset() {
+  const identifier = $("loginEmail")?.value.trim().toLowerCase();
+  if (!identifier || !identifier.includes("@")) {
+    toast("Enter your registered email address first.", "info", 3600);
+    $("loginEmail")?.focus();
+    return;
+  }
+  if (!window._auth || !firebaseReady || !window._sendPasswordResetEmail) {
+    toast("Password reset is temporarily unavailable.", "error");
+    return;
+  }
+  try {
+    await window._sendPasswordResetEmail(window._auth, identifier);
+    toast("Password reset email sent. Check your inbox.", "success", 5000);
+  } catch (e) {
+    const code = e?.code || "";
+    const msg = code === "auth/user-not-found"
+      ? "No account was found for that email."
+      : code === "auth/invalid-email"
+      ? "Please enter a valid email address."
+      : "Could not send the reset email. Please try again.";
+    toast(msg, "error", 5000);
+  }
+}
+window.sendPasswordReset = sendPasswordReset;
+
 async function doSignup() {
   const name = $("signName")?.value.trim();
   const email = $("signEmail")?.value.trim().toLowerCase();
@@ -1087,7 +1145,7 @@ async function doSignup() {
   if (errorDiv) { errorDiv.textContent = ""; errorDiv.classList.remove("show"); }
   if (!name || !email || !phone || !pass) { if (errorDiv) { errorDiv.textContent = "Please fill all fields."; errorDiv.classList.add("show"); } return; }
   if (!/^\S+@\S+\.\S+$/.test(email)) { if (errorDiv) { errorDiv.textContent = "Please enter a valid email address."; errorDiv.classList.add("show"); } return; }
-  if (pass.length < 6) { if (errorDiv) { errorDiv.textContent = "Password must be at least 6 characters."; errorDiv.classList.add("show"); } return; }
+  if (pass.length < 6 || pass.length > 128) { if (errorDiv) { errorDiv.textContent = "Password must be 6–128 characters."; errorDiv.classList.add("show"); } return; }
   if (!firebaseReady) { toast("Connecting to database...", "info"); return; }
 
   let acquisition = null;
@@ -1117,7 +1175,7 @@ async function doSignup() {
 
     const newRef = window._push(window._ref(window._db, "users"));
     const now = Date.now();
-    const userData = { name, email, number: phone, uid: cred.user.uid, authProvider: "password", gender: selectedGender, createdAt: now };
+    const userData = { name, email, number: phone, uid: cred.user.uid, authProvider: "password", gender: selectedGender, status: "active", blocked: false, createdAt: now };
     if (acquisition) { userData.acquisition = acquisition; userData.signupSource = acquisition.signup.source; userData.signupCampaign = acquisition.signup.campaign || ""; }
     try { await window._set(newRef, userData); }
     catch (dbError) {
