@@ -48,6 +48,8 @@ window._update = update;
 window._onValue = onValue;
 window._runTransaction = runTransaction;
 window._increment = increment;
+window._createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+window._signInWithEmailAndPassword = signInWithEmailAndPassword;
 
 const DEFAULT_WEBSITE_NAME = SITE_NAME_DEFAULT; // "Sayem WebStore"
 const DEFAULT_LOGO = "icons/icon-192.png";
@@ -884,14 +886,6 @@ async function syncAuthProfile(authUser) {
   }
 }
 
-function saveSession(user) {
-  currentUser = user;
-  window.currentUser = user;
-  localStorage.setItem("samweb_user", JSON.stringify(user));
-  updateHeaderUser();
-  buildSideMenu();
-}
-
 function clearSession() {
   currentUser = null;
   window.currentUser = null;
@@ -1037,7 +1031,7 @@ async function doLogin() {
 
     if (authEmail) {
       try {
-        const cred = await signInWithEmailAndPassword(window._auth, authEmail, pass);
+        const cred = await window._signInWithEmailAndPassword(window._auth, authEmail, pass);
         if (await syncAuthProfile(cred.user)) {
           toast(`Welcome back, ${currentUser.name || "User"}! 🎉`, "success");
           if (currentRoute.kind === "detail" || currentRoute.kind === "notfound") rerenderCurrentDetail();
@@ -1061,7 +1055,7 @@ async function doLogin() {
 
     if (legacyFound.email && !legacyFound.uid) {
       try {
-        const cred = await createUserWithEmailAndPassword(window._auth, String(legacyFound.email).toLowerCase(), pass);
+        const cred = await window._createUserWithEmailAndPassword(window._auth, String(legacyFound.email).toLowerCase(), pass);
         await window._update(window._ref(window._db, `users/${legacyFound.key}`), { uid: cred.user.uid, authProvider: "password", password: null });
         legacyFound.uid = cred.user.uid;
         legacyFound.authProvider = "password";
@@ -1110,7 +1104,7 @@ async function doSignup() {
     if (phoneExists) { if (errorDiv) { errorDiv.textContent = "This phone number is already registered."; errorDiv.classList.add("show"); } return; }
 
     let cred;
-    try { cred = await createUserWithEmailAndPassword(window._auth, email, pass); }
+    try { cred = await window._createUserWithEmailAndPassword(window._auth, email, pass); }
     catch (authError) {
       console.error("Firebase Auth signup error:", authError);
       if (errorDiv) {
