@@ -546,9 +546,9 @@ test("escapeHtml/truncateText", () => {
  });
  test("proposed rules protect user status and validate review/report input", () => {
    const c = fs.readFileSync(new URL("../database.rules.proposed.json", import.meta.url), "utf8");
-   assertIncludes(c, 'newData.child("blocked").val() === data.child("blocked").val()');
-   assertIncludes(c, 'comment").val().length <= 2000');
-   assertIncludes(c, 'subject").val().length <= 200');
+   assertIncludes(c, "newData.child('blocked').val() === data.child('blocked').val()");
+   assertIncludes(c, "comment').val().length <= 2000");
+   assertIncludes(c, "subject').val().length <= 200");
    assertIncludes(c, "newData.val() === data.val() + 1");
  });
  test("admin panel includes account blocking and password reauthentication", () => {
