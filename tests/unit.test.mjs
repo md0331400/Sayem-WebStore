@@ -10,6 +10,7 @@ import {
   getReviewCount,
   resolveUpdateStatus,
   isSafeDownloadUrl,
+  isSafeAssetUrl,
   buildAppViewModel,
   renderAppDetailInner,
   renderNotFoundInner,
@@ -97,10 +98,12 @@ test("app card has no View & Download CTA", () => {
 });
 
 test("asset URL validator rejects unsafe protocols", () => {
-  assert(!/^https?:\/\//i.test("javascript:alert(1)"));
-  assert(/^https?:\/\//i.test("https://example.com/icon.png"));
+  assert(!isSafeAssetUrl("javascript:alert(1)"));
+  assert(!isSafeAssetUrl("data:text/plain,x"));
+  assert(isSafeAssetUrl("https://example.com/icon.png"));
 });
-\n// ============ UPDATE CHECKER (§69 matrix) ============
+
+// ============ UPDATE CHECKER (§69 matrix) ============
 suite("Update checker");
 test("installed 10, website 11 → update prompt", () => {
   const r = resolveUpdateStatus(10, 11);
