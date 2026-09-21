@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, push, set, get, remove, update, onValue, runTransaction, increment } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, deleteUser } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
   SITE_ORIGIN,
   SITE_NAME_DEFAULT,
@@ -35,7 +36,9 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getDatabase(firebaseApp);
+const auth = getAuth(firebaseApp);
 window._db = db;
+window._auth = auth;
 window._ref = ref;
 window._push = push;
 window._set = set;
@@ -443,7 +446,7 @@ function applyRoute(pathname, search = "", hash = "") {
 
 function resolveDetailRoute(slug, typeHint, params) {
   const key = slugIndex.bySlug.get(slug);
-  const app = key ? allApps.find((a) => a.key === key) : null;
+  const app = key ? allApps.find((a) => a.key === key && isPublicApp(a)) : null;
 
   if (!allApps.length && !appsLoadFailed) {
     // Catalog not loaded yet — wait for the first snapshot (or cache) before deciding 404.
@@ -747,8 +750,8 @@ function renderSearchResults() {
     return;
   }
 
-  const results = allApps.filter((app) => {
-    const hay = `${app.name || ""} ${app.category || ""} ${app.description || ""}`.toLowerCase();
+  const results = getPublicApps(allApps).filter((app) => {
+    const hay = `${app.name || ""} ${app.category || ""} ${app.description || ""} ${app.developerName || ""} ${app.packageName || ""} ${app.versionName || ""}`.toLowerCase();
     return hay.includes(q);
   });
 
@@ -824,19 +827,61 @@ function closeMenu() {
 }
 window.closeMenu = closeMenu;
 
+function sanitizeSessionUser(user) {
+  if (!user || typeof user !== "object") return null;
+  const clean = { ...user };
+  delete clean.password;
+  delete clean.authToken;
+  return clean;
+}
+
 function loadSession() {
   try {
     const saved = localStorage.getItem("samweb_user");
     if (saved) {
-      currentUser = JSON.parse(saved);
+      currentUser = sanitizeSessionUser(JSON.parse(saved));
       window.currentUser = currentUser;
+      if (currentUser) localStorage.setItem("samweb_user", JSON.stringify(currentUser));
     }
   } catch {
     currentUser = null;
     window.currentUser = null;
+    try { localStorage.removeItem("samweb_user"); } catch {}
   }
   updateHeaderUser();
   buildSideMenu();
+}
+
+function saveSession(user) {
+  const clean = sanitizeSessionUser(user);
+  currentUser = clean;
+  window.currentUser = clean;
+  if (clean) localStorage.setItem("samweb_user", JSON.stringify(clean));
+  updateHeaderUser();
+  buildSideMenu();
+}
+
+async function syncAuthProfile(authUser) {
+  if (!authUser?.uid || !firebaseReady) return false;
+  try {
+    const snap = await window._get(window._ref(window._db, "users"));
+    let found = null;
+    if (snap.exists()) snap.forEach((child) => {
+      const u = child.val() || {};
+      if (u.uid === authUser.uid || (!u.uid && String(u.email || "").toLowerCase() === String(authUser.email || "").toLowerCase())) found = { ...u, key: child.key };
+    });
+    if (!found) return false;
+    if (!found.uid) {
+      await window._update(window._ref(window._db, `users/${found.key}`), { uid: authUser.uid, authProvider: "password" });
+      found.uid = authUser.uid;
+      found.authProvider = "password";
+    }
+    saveSession(found);
+    return true;
+  } catch (e) {
+    console.warn("Auth profile sync failed:", e);
+    return false;
+  }
 }
 
 function saveSession(user) {
@@ -973,113 +1018,103 @@ window.selectGender = selectGender;
 
 async function doLogin() {
   const identifier = $("loginEmail")?.value.trim();
-  const pass = $("loginPass")?.value;
-  if (!identifier || !pass) {
-    toast("Please fill all fields", "error");
-    return;
-  }
-  if (!firebaseReady) {
-    toast("Connecting to database...", "info");
-    return;
-  }
+  const pass = $("loginPass")?.value || "";
+  if (!identifier || !pass) { toast("Please fill all fields", "error"); return; }
+  if (!firebaseReady) { toast("Connecting to database...", "info"); return; }
 
+  const normalized = identifier.toLowerCase();
+  let legacyFound = null;
   try {
-    const snap = await window._get(window._ref(window._db, "users"));
-    if (snap.exists()) {
-      let found = null;
-      snap.forEach((child) => {
-        const u = child.val();
-        if ((u.email === identifier || u.number === identifier) && u.password === pass) {
-          found = { ...u, key: child.key };
-        }
+    let authEmail = identifier.includes("@") ? normalized : "";
+    if (!authEmail) {
+      const snap = await window._get(window._ref(window._db, "users"));
+      if (snap.exists()) snap.forEach((child) => {
+        const u = child.val() || {};
+        if (String(u.number || "") === identifier) legacyFound = { ...u, key: child.key };
       });
-      if (found) {
-        saveSession(found);
-        toast(`Welcome back, ${found.name || "User"}! 🎉`, "success");
-        // Return to where the user was (e.g. an app page they wanted to review)
-        if (currentRoute.kind === "detail" || currentRoute.kind === "notfound") {
-          rerenderCurrentDetail();
-        } else {
-          navigate(lastNonDetailPath && lastNonDetailPath !== "/" ? lastNonDetailPath : "/");
-        }
-      } else {
-        toast("Invalid credentials!", "error");
-      }
-    } else {
-      toast("No users found. Please sign up!", "error");
+      authEmail = legacyFound?.email ? String(legacyFound.email).toLowerCase() : "";
     }
+
+    if (authEmail) {
+      try {
+        const cred = await signInWithEmailAndPassword(window._auth, authEmail, pass);
+        if (await syncAuthProfile(cred.user)) {
+          toast(`Welcome back, ${currentUser.name || "User"}! 🎉`, "success");
+          if (currentRoute.kind === "detail" || currentRoute.kind === "notfound") rerenderCurrentDetail();
+          else navigate(lastNonDetailPath && lastNonDetailPath !== "/" ? lastNonDetailPath : "/");
+          return;
+        }
+      } catch (authError) {
+        console.warn("Firebase Auth login failed; checking legacy account:", authError?.code || "unknown");
+      }
+    }
+
+    if (!legacyFound) {
+      const snap = await window._get(window._ref(window._db, "users"));
+      if (snap.exists()) snap.forEach((child) => {
+        const u = child.val() || {};
+        if ((String(u.email || "").toLowerCase() === normalized || String(u.number || "") === identifier) && u.password === pass) legacyFound = { ...u, key: child.key };
+      });
+    } else if (legacyFound.password !== pass) legacyFound = null;
+
+    if (!legacyFound) { toast("Invalid email/phone or password.", "error"); return; }
+
+    if (legacyFound.email && !legacyFound.uid) {
+      try {
+        const cred = await createUserWithEmailAndPassword(window._auth, String(legacyFound.email).toLowerCase(), pass);
+        await window._update(window._ref(window._db, `users/${legacyFound.key}`), { uid: cred.user.uid, authProvider: "password", password: null });
+        legacyFound.uid = cred.user.uid;
+        legacyFound.authProvider = "password";
+        delete legacyFound.password;
+        toast("Account security upgraded successfully. ✅", "success", 3200);
+      } catch (migrationError) {
+        console.warn("Legacy account migration skipped:", migrationError?.code || "unknown");
+      }
+    }
+    delete legacyFound.password;
+    saveSession(legacyFound);
+    if (currentRoute.kind === "detail" || currentRoute.kind === "notfound") rerenderCurrentDetail();
+    else navigate(lastNonDetailPath && lastNonDetailPath !== "/" ? lastNonDetailPath : "/");
   } catch (e) {
-    toast(`Error: ${e.message}`, "error");
+    console.error("Login error:", e);
+    toast("Login failed. Please check your connection and try again.", "error");
   }
 }
 window.doLogin = doLogin;
 
 async function doSignup() {
   const name = $("signName")?.value.trim();
-  const email = $("signEmail")?.value.trim();
+  const email = $("signEmail")?.value.trim().toLowerCase();
   const phone = $("signPhone")?.value.trim();
-  const pass = $("signPass")?.value;
+  const pass = $("signPass")?.value || "";
   const errorDiv = $("signupError");
   const sourceAnswer = $("signSource")?.value || "";
+  if (errorDiv) { errorDiv.textContent = ""; errorDiv.classList.remove("show"); }
+  if (!name || !email || !phone || !pass) { if (errorDiv) { errorDiv.textContent = "Please fill all fields."; errorDiv.classList.add("show"); } return; }
+  if (!/^\S+@\S+\.\S+$/.test(email)) { if (errorDiv) { errorDiv.textContent = "Please enter a valid email address."; errorDiv.classList.add("show"); } return; }
+  if (pass.length < 6) { if (errorDiv) { errorDiv.textContent = "Password must be at least 6 characters."; errorDiv.classList.add("show"); } return; }
+  if (!firebaseReady) { toast("Connecting to database...", "info"); return; }
 
-  if (errorDiv) {
-    errorDiv.innerHTML = "";
-    errorDiv.classList.remove("show");
-  }
-
-  if (!name || !email || !phone || !pass) {
-    if (errorDiv) {
-      errorDiv.innerHTML = "❌ Please fill all fields!";
-      errorDiv.classList.add("show");
-    }
-    return;
-  }
-
-  if (pass.length < 6) {
-    if (errorDiv) {
-      errorDiv.innerHTML = "❌ Password must be at least 6 characters!";
-      errorDiv.classList.add("show");
-    }
-    return;
-  }
-
-  if (!firebaseReady) {
-    toast("Connecting to database...", "info");
-    return;
-  }
-
-  // Attribution is non-critical analytics: getSignupAcquisition never throws,
-  // and even if it somehow did, signup continues with a safe fallback.
-  let acquisition;
-  try {
-    acquisition = getSignupAcquisition(sourceAnswer);
-  } catch {
-    acquisition = null;
-  }
+  let acquisition = null;
+  try { acquisition = getSignupAcquisition(sourceAnswer); } catch {}
 
   try {
     const snap = await window._get(window._ref(window._db, "users"));
-    let emailExists = false;
-    let phoneExists = false;
-    if (snap.exists()) {
-      snap.forEach((child) => {
-        const u = child.val();
-        if (u.email === email) emailExists = true;
-        if (u.number === phone) phoneExists = true;
-      });
-    }
+    let emailExists = false, phoneExists = false;
+    if (snap.exists()) snap.forEach((child) => {
+      const u = child.val() || {};
+      if (String(u.email || "").toLowerCase() === email) emailExists = true;
+      if (String(u.number || "") === phone) phoneExists = true;
+    });
+    if (emailExists) { if (errorDiv) { errorDiv.textContent = "This email is already registered."; errorDiv.classList.add("show"); } return; }
+    if (phoneExists) { if (errorDiv) { errorDiv.textContent = "This phone number is already registered."; errorDiv.classList.add("show"); } return; }
 
-    if (emailExists) {
+    let cred;
+    try { cred = await createUserWithEmailAndPassword(window._auth, email, pass); }
+    catch (authError) {
+      console.error("Firebase Auth signup error:", authError);
       if (errorDiv) {
-        errorDiv.innerHTML = "❌ This email is already registered!";
-        errorDiv.classList.add("show");
-      }
-      return;
-    }
-
-    if (phoneExists) {
-      if (errorDiv) {
-        errorDiv.innerHTML = "❌ This phone number is already registered!";
+        errorDiv.textContent = authError?.code === "auth/operation-not-allowed" ? "Email/password sign-in is not enabled in Firebase yet." : "Could not create the account. Please try again.";
         errorDiv.classList.add("show");
       }
       return;
@@ -1087,54 +1122,36 @@ async function doSignup() {
 
     const newRef = window._push(window._ref(window._db, "users"));
     const now = Date.now();
-    const userData = {
-      name,
-      email,
-      number: phone,
-      password: pass,
-      gender: selectedGender,
-      createdAt: now
-    };
-    if (acquisition) {
-      userData.acquisition = acquisition;
-      // Denormalized mirror of acquisition.signup — never changed after registration.
-      userData.signupSource = acquisition.signup.source;
-      userData.signupCampaign = acquisition.signup.campaign || "";
-    }
-    await window._set(newRef, userData);
-
-    // Aggregate daily signup counter per source (conversion analytics).
-    // Exactly one write per signup — never per pageview.
-    if (acquisition && acquisition.signup && window._increment) {
-      try {
-        const day = new Date(now).toISOString().slice(0, 10);
-        const sKey = String(acquisition.signup.source || "Unknown").replace(/[^A-Za-z0-9]+/g, "_").slice(0, 40) || "Unknown";
-        window._update(
-          window._ref(window._db, `analytics/daily/${day}/sources/${sKey}/signups`),
-          window._increment(1)
-        ).catch(() => {});
-      } catch {
-        /* analytics best-effort */
-      }
+    const userData = { name, email, number: phone, uid: cred.user.uid, authProvider: "password", gender: selectedGender, createdAt: now };
+    if (acquisition) { userData.acquisition = acquisition; userData.signupSource = acquisition.signup.source; userData.signupCampaign = acquisition.signup.campaign || ""; }
+    try { await window._set(newRef, userData); }
+    catch (dbError) {
+      console.error("User profile write failed:", dbError);
+      try { await deleteUser(cred.user); } catch (cleanupError) { console.warn("Auth cleanup failed:", cleanupError); }
+      if (errorDiv) { errorDiv.textContent = "Account creation failed. Please try again."; errorDiv.classList.add("show"); }
+      return;
     }
 
     saveSession({ ...userData, key: newRef.key });
-    toast(`Account created! Welcome ${name} 🎉`, "success");
-    if (currentRoute.kind === "detail" || currentRoute.kind === "notfound") {
-      rerenderCurrentDetail();
-    } else {
-      navigate(lastNonDetailPath && lastNonDetailPath !== "/" ? lastNonDetailPath : "/");
+    if (acquisition?.signup && window._increment) {
+      try {
+        const day = new Date(now).toISOString().slice(0, 10);
+        const sKey = String(acquisition.signup.source || "Unknown").replace(/[^A-Za-z0-9]+/g, "_").slice(0, 40) || "Unknown";
+        await window._update(window._ref(window._db, `analytics/daily/${day}/sources/${sKey}/signups`), window._increment(1));
+      } catch {}
     }
+    toast("Account created successfully! 🎉", "success");
+    ["signName","signEmail","signPhone","signPass"].forEach((id) => { const el=$(id); if(el) el.value=""; });
+    if (currentRoute.kind === "detail" || currentRoute.kind === "notfound") rerenderCurrentDetail(); else navigate("/");
   } catch (e) {
-    if (errorDiv) {
-      errorDiv.innerHTML = `❌ Error: ${e.message}`;
-      errorDiv.classList.add("show");
-    }
+    console.error("Signup error:", e);
+    toast("Signup failed. Please check your connection and try again.", "error");
   }
 }
 window.doSignup = doSignup;
 
-function doLogout() {
+async function doLogout() {
+  try { if (window._auth?.currentUser) await signOut(window._auth); } catch (e) { console.warn("Firebase sign-out failed:", e); }
   clearSession();
   toast("Logged out successfully", "success");
   if (currentRoute.kind === "detail" || currentRoute.kind === "notfound") {
@@ -1428,7 +1445,7 @@ function ratingLabel(app) {
 }
 
 function getFeaturedApps(source = allApps) {
-  return [...source]
+  return [...getPublicApps(source)]
     .sort((a, b) => {
       const dl = (b.downloads || 0) - (a.downloads || 0);
       if (dl !== 0) return dl;
@@ -1439,13 +1456,14 @@ function getFeaturedApps(source = allApps) {
 
 function getLatestApps(source = allApps, limit = 6) {
   // Firebase push keys are chronological → newest records sort last.
-  return [...source].sort((a, b) => String(b.key).localeCompare(String(a.key))).slice(0, limit);
+  return [...getPublicApps(source)].sort((a, b) => String(b.key).localeCompare(String(a.key))).slice(0, limit);
 }
 
 function updateHeroMetrics(source = allApps) {
-  const totalApps = source.length;
-  const totalDownloads = source.reduce((sum, app) => sum + (Number(app.downloads) || 0), 0);
-  const rated = source.map((app) => getAverageRating(app)).filter((v) => v !== null);
+  const publicSource = getPublicApps(source);
+  const totalApps = publicSource.length;
+  const totalDownloads = publicSource.reduce((sum, app) => sum + (Number(app.downloads) || 0), 0);
+  const rated = publicSource.map((app) => getAverageRating(app)).filter((v) => v !== null);
   const totalRatings = rated.length ? (rated.reduce((sum, v) => sum + v, 0) / rated.length).toFixed(1) : "—";
 
   if ($("heroAppsCount")) $("heroAppsCount").textContent = formatNum(totalApps);
@@ -1522,13 +1540,10 @@ function setupBannerSwipe(banner) {
 
 function moveBanner(dir) {
   const slides = document.querySelectorAll("#featureBanner .banner-slide");
-  const dots = document.querySelectorAll("#featureBanner .banner-dot");
   if (!slides.length) return;
   slides[bannerIndex]?.classList.remove("active");
-  dots[bannerIndex]?.classList.remove("active");
   bannerIndex = (bannerIndex + dir + slides.length) % slides.length;
   slides[bannerIndex]?.classList.add("active");
-  dots[bannerIndex]?.classList.add("active");
   startBannerTimer();
 }
 window.moveBanner = moveBanner;
@@ -1543,8 +1558,15 @@ function renderHeroBanner(source = allApps) {
   bannerIndex = 0;
 
   // Top apps first → lowest apps later (auto slides through them)
-  const apps = [...source]
-    .sort((a, b) => (b.downloads || 0) - (a.downloads || 0))
+  const publicSource = getPublicApps(source);
+  const explicit = publicSource.filter((app) => app.featured === true);
+  const fallback = publicSource.filter((app) => app.featured !== true);
+  const apps = [...explicit, ...fallback]
+    .sort((a, b) => {
+      const featuredDiff = Number(b.featured === true) - Number(a.featured === true);
+      if (featuredDiff) return featuredDiff;
+      return (Number(b.downloads) || 0) - (Number(a.downloads) || 0);
+    })
     .slice(0, 10);
 
   if (!apps.length) {
@@ -1660,8 +1682,16 @@ function matchesCategory(app, category) {
   return category === "All" || (app.category || "Other") === category;
 }
 
+function isPublicApp(app) {
+  return !!app && app.published !== false;
+}
+
+function getPublicApps(source = allApps) {
+  return (source || []).filter(isPublicApp);
+}
+
 function filterForCurrentViews() {
-  return allApps.filter((app) => matchesCategory(app, categoryFilter.home));
+  return getPublicApps(allApps).filter((app) => matchesCategory(app, categoryFilter.home));
 }
 
 function renderApps(apps) {
@@ -1711,7 +1741,7 @@ function scheduleAppsRender() {
 function renderGamesAppsPages() {
   const gamesGrid = $("gamesGrid");
   if (gamesGrid) {
-    const games = allApps.filter(isGameApp).filter((a) => matchesCategory(a, categoryFilter.games));
+    const games = getPublicApps(allApps).filter(isGameApp).filter((a) => matchesCategory(a, categoryFilter.games));
     const gamesCount = $("gamesCount");
     if (gamesCount) gamesCount.textContent = games.length ? `${games.length} games available` : "";
     gamesGrid.innerHTML = games.length
@@ -1721,7 +1751,7 @@ function renderGamesAppsPages() {
 
   const appsPageGrid = $("appsPageGrid");
   if (appsPageGrid) {
-    const apps = allApps.filter((app) => !isGameApp(app)).filter((a) => matchesCategory(a, categoryFilter.apps));
+    const apps = getPublicApps(allApps).filter((app) => !isGameApp(app)).filter((a) => matchesCategory(a, categoryFilter.apps));
     const appsPageCount = $("appsPageCount");
     if (appsPageCount) appsPageCount.textContent = apps.length ? `${apps.length} apps available` : "";
     appsPageGrid.innerHTML = apps.length
@@ -1929,7 +1959,7 @@ async function submitReview(appName) {
     let existingReviewId = null;
 
     for (const rid in existingReviews) {
-      if (existingReviews[rid] && existingReviews[rid].userId === currentUser.key) {
+      if ((existingReviews[rid].userId === currentUser.key || existingReviews[rid].userId === currentUser.uid)) {
         existingReviewId = rid;
         break;
       }
@@ -1945,7 +1975,7 @@ async function submitReview(appName) {
       toast("Your review has been updated! ✅", "success");
     } else {
       await window._set(window._push(window._ref(window._db, `apps/${currentAppId}/reviews`)), {
-        userId: currentUser.key,
+        userId: currentUser.uid || currentUser.key,
         username: currentUser.name,
         rating: selectedRatingValue,
         comment,
@@ -2081,7 +2111,7 @@ async function sendReport() {
     await window._set(newRef, {
       username: currentUser.name,
       email: currentUser.email || "",
-      userId: currentUser.key || "",
+      userId: currentUser.uid || currentUser.key || "",
       subject: sub,
       message: msg,
       timestamp: Date.now(),
@@ -2266,7 +2296,16 @@ function onFirebaseReady() {
   loadApps();
   loadWebsiteSettings();
   subscribeAds();
+  if (window._auth?.currentUser) void syncAuthProfile(window._auth.currentUser);
 }
+
+onAuthStateChanged(window._auth, async (authUser) => {
+  if (authUser) {
+    if (firebaseReady) await syncAuthProfile(authUser);
+  } else if (currentUser?.uid) {
+    clearSession();
+  }
+});
 
 window.addEventListener("firebaseReady", onFirebaseReady);
 
