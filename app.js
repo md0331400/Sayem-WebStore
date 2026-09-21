@@ -840,18 +840,17 @@ function sanitizeSessionUser(user) {
 }
 
 function loadSession() {
+  // Do not trust localStorage as authentication. It is only an optional UI hint;
+  // Firebase Auth onAuthStateChanged establishes the real session.
   try {
     const saved = localStorage.getItem("samweb_user");
-    if (saved) {
-      currentUser = sanitizeSessionUser(JSON.parse(saved));
-      window.currentUser = currentUser;
-      if (currentUser) localStorage.setItem("samweb_user", JSON.stringify(currentUser));
-    }
+    window.__savedSessionHint = saved ? sanitizeSessionUser(JSON.parse(saved)) : null;
   } catch {
-    currentUser = null;
-    window.currentUser = null;
+    window.__savedSessionHint = null;
     try { localStorage.removeItem("samweb_user"); } catch {}
   }
+  currentUser = null;
+  window.currentUser = null;
   updateHeaderUser();
   buildSideMenu();
 }
@@ -876,12 +875,31 @@ function saveSession(user) {
 async function syncAuthProfile(authUser) {
   if (!authUser?.uid || !firebaseReady) return false;
   try {
-    const snap = await window._get(window._ref(window._db, "users"));
     let found = null;
-    if (snap.exists()) snap.forEach((child) => {
-      const u = child.val() || {};
-      if (u.uid === authUser.uid || (!u.uid && String(u.email || "").toLowerCase() === String(authUser.email || "").toLowerCase())) found = { ...u, key: child.key };
-    });
+    let profileKey = "";
+
+    // Fast path for migrated accounts.
+    try {
+      const mapSnap = await window._get(window._ref(window._db, `userUids/${authUser.uid}`));
+      const mapped = mapSnap.exists() ? mapSnap.val() : null;
+      profileKey = typeof mapped === "string" ? mapped : String(mapped?.key || "");
+      if (profileKey) {
+        const profileSnap = await window._get(window._ref(window._db, `users/${profileKey}`));
+        if (profileSnap.exists()) found = { ...(profileSnap.val() || {}), key: profileKey };
+      }
+    } catch {}
+
+    // Legacy fallback only for accounts that have not yet been mapped.
+    if (!found) {
+      const snap = await window._get(window._ref(window._db, "users"));
+      if (snap.exists()) snap.forEach((child) => {
+        const u = child.val() || {};
+        if (u.uid === authUser.uid || (!u.uid && String(u.email || "").toLowerCase() === String(authUser.email || "").toLowerCase())) {
+          found = { ...u, key: child.key };
+        }
+      });
+    }
+
     if (!found) return false;
 
     if (found.blocked === true) {
@@ -898,13 +916,16 @@ async function syncAuthProfile(authUser) {
       found.uid = authUser.uid;
       found.authProvider = "password";
     }
-    // Remove legacy plaintext password as soon as Firebase Auth login succeeds.
     if (Object.prototype.hasOwnProperty.call(found, "password")) {
       profileUpdates.password = null;
       delete found.password;
     }
     if (Object.keys(profileUpdates).length) {
       await window._update(window._ref(window._db, `users/${found.key}`), profileUpdates);
+    }
+
+    if (!profileKey) {
+      try { await window._set(window._ref(window._db, `userUids/${authUser.uid}`), { key: found.key }); } catch {}
     }
 
     saveSession(found);
@@ -914,7 +935,6 @@ async function syncAuthProfile(authUser) {
     return false;
   }
 }
-
 function clearSession() {
   currentUser = null;
   window.currentUser = null;
@@ -1090,6 +1110,7 @@ async function doLogin() {
       try {
         const cred = await window._createUserWithEmailAndPassword(window._auth, String(legacyFound.email).toLowerCase(), pass);
         await window._update(window._ref(window._db, `users/${legacyFound.key}`), { uid: cred.user.uid, authProvider: "password", password: null });
+        try { await window._set(window._ref(window._db, `userUids/${cred.user.uid}`), { key: legacyFound.key }); } catch (mappingError) { console.warn("Legacy uid mapping write skipped:", mappingError); }
         legacyFound.uid = cred.user.uid;
         legacyFound.authProvider = "password";
         delete legacyFound.password;
@@ -1184,6 +1205,12 @@ async function doSignup() {
       try { await deleteUser(cred.user); } catch (cleanupError) { console.warn("Auth cleanup failed:", cleanupError); }
       if (errorDiv) { errorDiv.textContent = "Account creation failed. Please try again."; errorDiv.classList.add("show"); }
       return;
+    }
+    try {
+      await window._set(window._ref(window._db, `userUids/${cred.user.uid}`), { key: newRef.key });
+    } catch (mappingError) {
+      // Mapping is a performance/migration aid. The current session can continue safely.
+      console.warn("User uid mapping write skipped:", mappingError);
     }
 
     saveSession({ ...userData, key: newRef.key });
