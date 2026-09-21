@@ -202,13 +202,13 @@
     <div class="login-logo">⚙️ Sayem WebStore Admin</div>
     <div class="input-group">
       <label>Username / Email</label>
-      <input type="text" id="adminUser" placeholder="Enter username or email">
+      <input type="text" id="adminUser" placeholder="Enter username or email" autocomplete="username" maxlength="120">
     </div>
     <div class="input-group">
       <label>Password</label>
-      <input type="password" id="adminPass" placeholder="Enter password" onkeydown="if(event.key==='Enter')doAdminLogin()">
+      <input type="password" id="adminPass" placeholder="Enter password" autocomplete="current-password" maxlength="128" onkeydown="if(event.key==='Enter')doAdminLogin()">
     </div>
-    <button class="btn btn-primary" style="width:100%;" id="btnLogin">🔐 Login</button>
+    <button class="btn btn-primary" style="width:100%;" id="btnLogin">🔐 Login</button><button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px;" id="btnAdminReset">Forgot password?</button><div style="font-size:10px;color:var(--text-dim);text-align:center;margin-top:8px;">Password reset requires the admin email address.</div>
   </div>
 </div>
 
@@ -487,9 +487,9 @@
     <div class="admin-panel" id="settings">
       <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px;">
         <div style="font-weight:700;font-size:18px;margin-bottom:16px;">🔐 Admin Credentials</div>
-        <div class="input-group"><label>Current Password</label><input type="password" id="currentAdminPass" placeholder="Enter current password"></div>
+        <div class="input-group"><label>Current Password (required when changing password)</label><input type="password" id="currentAdminPass" placeholder="Enter current password" autocomplete="current-password" maxlength="128"></div>
         <div class="input-group"><label>New Username</label><input id="newAdminUser" placeholder="Leave blank to keep current"></div>
-        <div class="input-group"><label>New Password</label><input type="password" id="newAdminPass" placeholder="Leave blank to keep current"></div>
+        <div class="input-group"><label>New Password</label><input type="password" id="newAdminPass" placeholder="Leave blank to keep current" autocomplete="new-password" maxlength="128"></div>
         <button class="btn btn-primary" id="btnUpdateAdmin">Update Credentials</button>
       </div>
 
@@ -566,7 +566,7 @@
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import{getDatabase,ref,push,set,get,remove,update}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,onAuthStateChanged,signOut,updatePassword}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,sendPasswordResetEmail,onAuthStateChanged,signOut,updatePassword,EmailAuthProvider,reauthenticateWithCredential}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 const firebaseConfig={
   apiKey:"AIzaSyDo4VtvFjkHK_qPKw_8OvjWB3DF93m0_vE",
   authDomain:"samva-app-store.firebaseapp.com",
@@ -769,6 +769,7 @@ document.addEventListener('click', function (e) {
   }
 
   if (id === 'btnLogin' || target.closest('#btnLogin')) { doAdminLogin(); return; }
+  if (id === 'btnAdminReset' || target.closest('#btnAdminReset')) { sendAdminPasswordReset(); return; }
   if (id === 'btnLogout' || target.closest('#btnLogout')) { adminLogout(); return; }
   if (id === 'btnAddApp' || target.closest('#btnAddApp')) { addApp(); return; }
   if (id === 'btnUpdateAdmin' || target.closest('#btnUpdateAdmin')) { updateAdmin(); return; }
@@ -795,6 +796,11 @@ document.addEventListener('click', function (e) {
   if (id.startsWith('delAppBtn_')) {
     const key = id.replace('delAppBtn_', '');
     showConfirm('Delete App?', 'This cannot be undone.', () => deleteApp(key));
+    return;
+  }
+  if (id.startsWith('toggleUserBtn_')) {
+    const key = id.replace('toggleUserBtn_', '');
+    showConfirm('Update User Status?', 'Block/unblock this account?', () => toggleUserBlocked(key));
     return;
   }
   if (id.startsWith('delUserBtn_')) {
@@ -1495,7 +1501,7 @@ function renderUsers() {
       : `<span class="src-badge dim">no data</span>`;
     return `<div class="user-row">
       <div class="user-row-main">
-        <div style="font-weight:600;">${esc(u.name || 'User')} ${srcBadge}</div>
+        <div style="font-weight:600;">${esc(u.name || 'User')} ${srcBadge} ${u.blocked === true ? '<span class="src-badge" style="background:rgba(255,100,100,0.12);color:#f87171;border-color:rgba(255,100,100,0.3);">BLOCKED</span>' : '<span class="src-badge dim">ACTIVE</span>'}</div>
         <div class="user-meta">
           <span>${esc(u.email || u.number || '')}</span>
           <span>•</span><span>${esc(u.gender || 'N/A')}</span>
@@ -1503,8 +1509,9 @@ function renderUsers() {
           <span>•</span><span>📅 ${esc(fmtSignupDate(getUserSignupTs(u)))}</span>
         </div>
       </div>
-      <div style="display:flex;gap:6px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
         <button class="btn btn-outline btn-sm" id="viewUserBtn_${esc(u.key)}">👁 View</button>
+        <button class="btn btn-sm ${u.blocked === true ? 'btn-success' : 'btn-warning'}" id="toggleUserBtn_${esc(u.key)}">${u.blocked === true ? '✅ Unblock' : '🚫 Block'}</button>
         <button class="btn btn-danger btn-sm" id="delUserBtn_${esc(u.key)}">🗑 Delete</button>
       </div>
     </div>`;
@@ -1527,6 +1534,25 @@ function loadUsers() {
 }
 
 // ============ USER DETAIL (acquisition info) ============
+async function toggleUserBlocked(k) {
+  try {
+    const snap = await window._get(window._ref(window._db, 'users/' + k));
+    if (!snap.exists()) { toast('User not found', 'error'); return; }
+    const u = snap.val() || {};
+    const blocked = u.blocked !== true;
+    await window._update(window._ref(window._db, 'users/' + k), { blocked, status: blocked ? 'blocked' : 'active', updatedAt: Date.now() });
+    await logActivity(blocked ? '🚫 Blocked User' : '✅ Unblocked User', u.name || k);
+    toast(blocked ? 'User blocked.' : 'User unblocked.', 'success');
+    allUsersCache = null;
+    closeModal('userDetailOverlay');
+    loadUsers();
+    updateStats();
+  } catch (e) {
+    console.error(e);
+    toast('Could not update user status.', 'error');
+  }
+}
+
 function showUserDetail(k) {
   const u = (allUsersCache || []).find(x => x.key === k);
   if (!u) { toast('User not found — refresh the list', 'error'); return; }
@@ -1581,10 +1607,12 @@ function showUserDetail(k) {
       ${item('Phone', u.number)}
       ${item('Gender', u.gender)}
       ${item('Signup Date', fmtSignupDate(getUserSignupTs(u)))}
+      ${item('Status', u.blocked === true ? 'BLOCKED' : 'ACTIVE')}
       ${item('User Key', u.key)}
     </div>
     ${acqHtml}
     <div style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-sm ${u.blocked === true ? 'btn-success' : 'btn-warning'}" id="toggleUserBtn_${esc(u.key)}">${u.blocked === true ? '✅ Unblock User' : '🚫 Block User'}</button>
       <button class="btn btn-danger btn-sm" id="delUserBtn2_${esc(u.key)}">🗑 Delete User</button>
       <button class="btn btn-outline btn-sm" data-close="userDetailOverlay">Close</button>
     </div>`;
@@ -2121,23 +2149,43 @@ async function saveMaxPerSlot() {
 async function updateAdmin() {
   const nu = document.getElementById('newAdminUser').value.trim();
   const np = document.getElementById('newAdminPass').value.trim();
+  const cp = document.getElementById('currentAdminPass').value;
   if (!nu && !np) { toast('Nothing to update', 'info'); return; }
-  if (!window._auth?.currentUser) { toast('Admin password changes require a Firebase Auth session.', 'error'); return; }
-  if (np && np.length < 6) { toast('New password must be at least 6 characters.', 'error'); return; }
+  if (!window._auth?.currentUser || !currentAdminKey) { toast('Admin Auth session not available.', 'error'); return; }
   try {
-    if (np) await updatePassword(window._auth.currentUser, np);
+    if (np) {
+      if (!cp) { toast('Current password is required to change the password.', 'error'); return; }
+      if (np.length < 6 || np.length > 128) { toast('New password must be 6–128 characters.', 'error'); return; }
+      const email = window._auth.currentUser.email;
+      if (!email) { toast('Admin account has no Firebase Auth email.', 'error'); return; }
+      const credential = EmailAuthProvider.credential(email, cp);
+      await reauthenticateWithCredential(window._auth.currentUser, credential);
+      await updatePassword(window._auth.currentUser, np);
+    }
     const updates = {};
     if (nu) updates.username = nu;
-    if (Object.keys(updates).length) await window._update(window._ref(window._db, `admins/${currentAdminKey}`), updates);
-    toast('✅ Admin credentials updated. Password is managed by Firebase Auth.', 'success');
+    if (Object.keys(updates).length) await window._update(window._ref(window._db, 'admins/' + currentAdminKey), updates);
+    toast('✅ Admin credentials updated.', 'success');
     await logActivity('🔐 Updated Admin Credentials', np ? 'Password changed via Firebase Auth' : 'Username changed');
     document.getElementById('currentAdminPass').value = '';
     document.getElementById('newAdminUser').value = '';
     document.getElementById('newAdminPass').value = '';
   } catch(e) {
     console.error(e);
-    const msg = e?.code === 'auth/requires-recent-login' ? 'Please log in again before changing the password.' : 'Could not update credentials.';
+    const code = e?.code || '';
+    const msg = code === 'auth/wrong-password' || code === 'auth/invalid-credential' ? 'Current password is incorrect.' : code === 'auth/requires-recent-login' ? 'Please log in again before changing the password.' : 'Could not update credentials.';
     toast(msg, 'error');
+  }
+}
+async function sendAdminPasswordReset() {
+  const email = document.getElementById('adminUser')?.value.trim().toLowerCase();
+  if (!email || !email.includes('@')) { toast('Enter the admin email address first.', 'info', 3600); document.getElementById('adminUser')?.focus(); return; }
+  try {
+    await sendPasswordResetEmail(window._auth, email);
+    toast('Password reset email sent. Check the admin inbox.', 'success', 5000);
+  } catch (e) {
+    const msg = e?.code === 'auth/invalid-email' ? 'Enter a valid admin email address.' : 'Could not send reset email.';
+    toast(msg, 'error', 5000);
   }
 }
 async function saveSettings() {
