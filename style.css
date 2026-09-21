@@ -1327,8 +1327,20 @@ a {
 }
 
 .nav-icon {
-  width: 18px;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
   text-align: center;
+}
+
+.nav-icon-gif {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  display: block;
+  border-radius: 6px;
 }
 
 /* ---------- Ad slots (managed from Admin Panel → Ads Manager) ---------- */
