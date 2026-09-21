@@ -1863,21 +1863,24 @@ a {
   right: 12px;
   bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   z-index: 65;
-  width: min(calc(100vw - 24px), 300px);
+  width: 200px;
+  height: 200px;
+  box-sizing: border-box;
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px;
-  border-radius: var(--radius-md);
+  padding: 12px;
+  border-radius: 18px;
   background: var(--card);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
 }
-
 .install-banner-copy {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  min-width: 0;
 }
 
 .install-banner-copy strong {
@@ -1896,6 +1899,7 @@ a {
   flex-direction: row;
   gap: 6px;
   align-items: center;
+  width: 100%;
 }
 
 /* ---------- Toast / spinner ---------- */
@@ -2518,16 +2522,17 @@ a {
   .install-banner {
     left: auto;
     right: 12px;
-    width: min(280px, calc(100vw - 24px));
+    width: 200px;
+    height: 200px;
     bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    flex-direction: row;
-    padding: 9px;
-    gap: 8px;
+    flex-direction: column;
+    padding: 12px;
+    gap: 10px;
   }
 
   .install-banner-actions {
     flex-direction: row;
-    justify-content: flex-end;
+    justify-content: stretch;
   }
 }
 
@@ -2607,6 +2612,7 @@ a {
   .install-banner-actions {
     flex-direction: row;
     align-items: center;
+    width: 100%;
   }
 }
 
