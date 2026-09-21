@@ -31,10 +31,11 @@
       ".write": "auth != null && root.child('adminUids').child(auth.uid).exists()"
     },
     "users": {
+      ".read": "auth != null && root.child('adminUids').child(auth.uid).exists()",
       "$recordKey": {
         ".read": "auth != null && (data.child('uid').val() === auth.uid || root.child('adminUids').child(auth.uid).exists())",
         ".write": "auth != null && (data.child('uid').val() === auth.uid || newData.child('uid').val() === auth.uid || root.child('adminUids').child(auth.uid).exists())",
-        ".validate": "root.child('adminUids').child(auth.uid).exists() || (newData.child('uid').val() === auth.uid && (!data.exists() || (newData.child('blocked').val() === data.child('blocked').val() && newData.child('status').val() === data.child('status').val())))",
+        ".validate": "root.child('adminUids').child(auth.uid).exists() || (newData.child('uid').val() === auth.uid && !newData.child('password').exists() && (!data.exists() || (newData.child('blocked').val() === data.child('blocked').val() && newData.child('status').val() === data.child('status').val())))",
         ".indexOn": [
           "uid",
           "email",
@@ -62,10 +63,14 @@
       }
     },
     "admins": {
-      ".read": false,
-      ".write": false
+      "$recordKey": {
+        ".read": "auth != null && root.child('adminUids').child(auth.uid).child('adminKey').val() === $recordKey",
+        ".write": "auth != null && root.child('adminUids').child(auth.uid).child('adminKey').val() === $recordKey",
+        ".validate": "auth != null && root.child('adminUids').child(auth.uid).child('adminKey').val() === $recordKey && newData.child('uid').val() === auth.uid && !newData.child('password').exists()"
+      }
     },
     "adminUids": {
+
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": false
