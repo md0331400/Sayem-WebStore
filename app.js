@@ -1999,11 +1999,8 @@ window.submitReview = submitReview;
 
 async function incrementDownloadCounter(key) {
   try {
-    const appRef = window._ref(window._db, `apps/${key}`);
-    await window._runTransaction(appRef, (currentData) => {
-      if (currentData) currentData.downloads = (currentData.downloads || 0) + 1;
-      return currentData;
-    });
+    const counterRef = window._ref(window._db, `apps/${key}/downloads`);
+    await window._runTransaction(counterRef, (currentValue) => (Number(currentValue) || 0) + 1);
   } catch (e) {
     console.warn("Download counter update failed:", e);
   }
