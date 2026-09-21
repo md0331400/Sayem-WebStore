@@ -1,8 +1,8 @@
 // Service worker — Sayem WebStore PWA
 // Cache version bumped for the v4.1 SEO/router release so every client
 // picks up the new shell, seo-utils.js and attribution.js immediately.
-const STATIC_CACHE = 'sayem-static-v16';
-const RUNTIME_CACHE = 'sayem-runtime-v16';
+const STATIC_CACHE = 'sayem-static-v17';
+const RUNTIME_CACHE = 'sayem-runtime-v17';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -23,7 +23,8 @@ const CORE_ASSETS = [
 
 const EXTERNAL_ASSETS = [
   'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js',
-  'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js'
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js',
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js'
 ];
 
 function isBypassRequest(url) {
